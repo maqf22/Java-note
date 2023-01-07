@@ -1,0 +1,95 @@
+{
+  "main": {
+    "id": "cf4f65486736fc46",
+    "type": "split",
+    "children": [
+      {
+        "id": "3d1e655c528ad7b5",
+        "type": "leaf",
+        "state": {
+          "type": "markdown",
+          "state": {
+            "file": "01-JavaSE基础/2) 常量与变量.md",
+            "mode": "source",
+            "source": false
+          }
+        }
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "cf5ff66907cfedfd",
+    "type": "split",
+    "children": [
+      {
+        "id": "035237929da05951",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "5c11cfc0b370aa93",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {}
+            }
+          },
+          {
+            "id": "1ff4fa049805d89d",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "d53f7cd8fe0c2113",
+    "type": "split",
+    "children": [
+      {
+        "id": "ae2c300dac99d340",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "c265813c3f8e8d9a",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "01-JavaSE基础/2) 常量与变量.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "active": "3d1e655c528ad7b5",
+  "lastOpenFiles": [
+    "01-JavaSE基础/2) 常量与变量.md",
+    "01-JavaSE基础/1) 环境搭(windows).md"
+  ]
+}
