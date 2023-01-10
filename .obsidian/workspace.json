@@ -1,0 +1,143 @@
+{
+  "main": {
+    "id": "cf4f65486736fc46",
+    "type": "split",
+    "children": [
+      {
+        "id": "725b2c8dfef72fab",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "63260b0b2bf9949c",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "01-JavaSE基础/7) 流程控制(for).md",
+                "mode": "source",
+                "source": false
+              }
+            }
+          },
+          {
+            "id": "985d9eb43224de09",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "01-JavaSE基础/8) 数组.md",
+                "mode": "source",
+                "source": false
+              }
+            }
+          },
+          {
+            "id": "958fad372ede258b",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "01-JavaSE基础/9) 方法.md",
+                "mode": "source",
+                "source": false
+              }
+            }
+          }
+        ],
+        "currentTab": 2
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "cf5ff66907cfedfd",
+    "type": "split",
+    "children": [
+      {
+        "id": "035237929da05951",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "5c11cfc0b370aa93",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical"
+              }
+            }
+          },
+          {
+            "id": "1ff4fa049805d89d",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "d53f7cd8fe0c2113",
+    "type": "split",
+    "children": [
+      {
+        "id": "ae2c300dac99d340",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "c265813c3f8e8d9a",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "01-JavaSE基础/9) 方法.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:打开快速切换": false,
+      "graph:查看关系图谱": false,
+      "canvas:Create new canvas": false,
+      "command-palette:打开命令面板": false,
+      "markdown-importer:打开 Markdown 格式转换器": false
+    }
+  },
+  "active": "958fad372ede258b",
+  "lastOpenFiles": [
+    "01-JavaSE基础/8) 数组.md",
+    "01-JavaSE基础/7) 流程控制(for).md",
+    "01-JavaSE基础/5) 流程控制(switch).md",
+    "01-JavaSE基础/6) 流程控制(while).md",
+    "01-JavaSE基础/4) 流程控制(if else).md",
+    "01-JavaSE基础/3) 算术运算符.md",
+    "01-JavaSE基础/2) 常量与变量.md",
+    "01-JavaSE基础/1) 环境搭(windows).md"
+  ]
+}
