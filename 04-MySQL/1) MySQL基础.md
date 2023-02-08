@@ -270,7 +270,7 @@ drop table student;
 > 4. 0或NULL都意味着false，其余的值都意味着true
 
 
-## 八、类型转换
+# 八、类型转换
 
 > 在MySQL当中类型的转换可以参考Java中类型转换
 
@@ -482,5 +482,387 @@ insert into `stu` (`name`, `tel`) values
 # 方式四：子查询
 select '21', 'Rolly', '1', '25', '69.5', '15012430013', 'lxJava';
 insert into `stu` select '21', 'Rolly', '1', '25', '69.5', '15012430020', 'lxJava';
+```
+
+
+# 十七、update修改数据表中的数据
+
+```sql
+update tableName set col1=val1, col2=val2, ..., colN=valN [where requirement];
+```
+
+```sql
+update `stu` set `gender`='0' where id=5;
+update `stu` set `classid`='MySQL'; # 不加条件修改所有
+update `stu` set `gender`='0', `age`='18' where id=6;
+```
+
+
+# 十八、delete删除数据表中的数据
+
+```sql
+delete from tableName [where requirement];
+```
+
+
+# 十九、select查询数据表中的数据
+
+## 1. 查询语句的基本语法结构
+
+```sql
+select <[*/字段名]> from 表名 
+[where 查询条件]
+[group by 列名 [having 分组条件]] 
+[order by 列名]
+[limit x,y];
+```
+
+```sql
+# 基础用法
+select * from `stu`;
+select `name`, `gender`, `score`, `classid` from `stu`;
+
+# where 条件
+select `name`, `gender`, `score`, `classid` from `stu` where `gender`='0';
+
+# group by 分组
+select `name`, `gender`, `score`, `classid` from `stu` group by `gender`;
+select `gender`, count(`gender`) from `stu` group by `gender`; # 通常结合统计使用
+select `gender`, count(`gender`) from `stu` group by `gender` having `gender`!='-1';
+
+# order by 排序
+select * from `stu` order by `age`; # 默认是升序排序
+select * from `stu` order by `age` asc; # 默认是升序排序（asc默认可以省略）
+select * from `stu` order by `age` desc; # 降序排序
+
+# limit 限制
+select * from `stu` limit 4; # 显示前四条
+select * from `stu` limit 2, 4; # 跳过前两条显示四条
+```
+
+## 2. 为查询输出的结果字段名改名
+
+```sql
+select 字段名 as 新字段名 from 表名 ...;
+```
+
+```sql
+# 为查询出来的字须改名
+select `gender`, count(`gender`) as 'total' from `stu` group by `gender`;
+select `gender`, count(`gender`) 'total' from `stu` group by `gender`; # as可省略
+```
+
+
+# 二十、查询语句中的运算符
+
+## 1. 逻辑运算符
+
+- AND 或&&
+- OR 或 ||
+- NOT 或 !
+- XOR 或 ^ （逻辑异或）
+
+```sql
+# 逻辑运算符
+# 与
+select * from `stu` where true and true; # MySQL中推荐这种写
+select * from `stu` where true && true;
+select * from `stu` where `age` > 18 and `gender`='1';
+select * from `stu` where `age` > 18 && `gender`='1';
+# 或
+select * from `stu` where true or false;
+select * from `stu` where `gender` = '1' or `gender` = '0';
+select * from `stu` where `gender` = '1' || `gender` = '0';
+# 非
+select * from `stu` where not true;
+select * from `stu` where not `gender` = '-1';
+select * from `stu` where !(`gender` = '-1');
+select * from `stu` where `gender` != '-1'; # 效率最高（!=只运算了一次）
+# 异或（一真一假为真）
+select * from `stu` where true xor false;
+select * from `stu` where true xor true;
+select * from `stu` where false xor false;
+select * from `stu` where true ^ false;
+```
+
+## 2. 关系运算符
+
+- = 是否相等，相等为真
+- <=> 是否相等，相等为真，可判断NULL（不推荐使用）
+- != 或 <> 不等于值为真
+- <、>、<=、>= 基本关系运算符
+- is null 空为真
+- is not null 不空为真
+- between and 在从哪儿到哪儿之间
+- not between and 不在哪儿到哪儿之间
+- like 匹配字符串，有匹配为真
+- not like 匹配字符串，没有匹配为真
+- in 在集合里匹配，有结果为真
+- not in 不在集合里为真
+
+```sql
+# 关系运算符
+# 等于
+select * from `stu` where `id` = 2;
+select * from `stu` where `id` <=> 2;
+
+# 不等
+select * from `stu` where `id` != 3;
+select * from `stu` where `id` <> 3;
+
+# 大于（等于）/ 小于（等于）
+select * from `stu` where `score` >= 72;
+select * from `stu` where `score` <= 80;
+
+# 空
+select * from `stu` where `score` is null;
+select * from `stu` where `score` is not null;
+
+# between and
+select * from `stu` where `score` >= 75 and `score` <= 90;
+select * from `stu` where `score` between 75 and  90; # 等同上
+-- select * from `stu` where not (`score` >= 75 and `score` <= 90);
+select * from `stu` where `score` not between 75 and  90; # 等同上
+
+# like 表示字符串匹配（不区分大小写） %表示不定长度字符的通配符
+select * from `stu` where `name` like 'R%'; # 查询R开头的
+select * from `stu` where `name` like '%I%'; # 查询有I的
+# _（下划线）表示单个字符的通匹配符
+select * from `stu` where `name` like '__L%'; # 查询第三个是L的
+
+# in 
+select * from `stu` where `gender` = '0' or `gender` = '1';
+select * from `stu` where `gender` in('0', '1'); # 同上
+select * from `stu` where `gender` not in('0', '1');
+```
+
+## 3. 算术运算符
+ 
+- 参考Java当中的算述运算符
+
+```sql
+# 算术运算符
+select * from `stu` where `id` % 2 = 1;
+select `name`, `age` + 10 from `stu`;
+……
+```
+
+## 4. 常用函数
+
+- count() 统计计数
+- sum() 求和
+- avg() 求平均值
+- max() 求最大值
+- min() 求最小值
+- concat() 字符串连接
+
+```sql
+# 常用函数
+# 统计计数
+select count(*) from `stu`;
+select `gender`, count(`gender`) from `stu` group by `gender`;
+# 求和
+select sum(`score`) from `stu`;
+# 平均值
+select avg(`score`) from `stu`;
+select avg(`score`) from `stu` where `gender` = '0';
+# 最大值
+select max(`score`) from `stu` where `gender` = '1';
+select max(`score`) from `stu`;
+# 最小值
+select min(`score`) from `stu`;
+# 字符串连接
+select concat('hello', 'MySQL');
+select concat(
+	(select `name` from `stu` where `id` = 3),
+	', ',
+	(select `name` from `stu` where `id` = 4)
+);
+```
+
+
+# 二十一、多表查询
+
+## 1. 联合查询：union
+
+- 语法：`select ... union select ...`
+- 联合查询要求：联合查询结果联合显示
+	- 多个联合查询的字段结果数量一致（字段类型可以不一致）
+	- 联合查询的字段来源于第一个查询语句的字段
+- 查询选项：与select选项类似
+	- all：保留所有记录
+	- distinct：保留去重记录（默认）
+- where子句的使用
+
+```sql
+create table t02 like t01;
+insert into ...
+select * from t01 union select t02;
+select * from t01 union all select t02;
+```
+
+```sql
+create table `t01`(
+`id` int unsigned primary key auto_increment,
+`name` varchar(64) not null,
+`score` float(6,1) default 60.0
+);
+
+create table `t02` like `t01`;
+
+insert into `t01` (`name`, `score`) values
+('ZhangSan', '90'),
+('LiSi', '91'),
+('WangWu', '92'),
+('LaoLiu', '93'),
+('ZhaoQi', '94');
+
+insert into `t02` (`name`, `score`) values
+('ZhangSan', '90'),
+('LiSi', '91'),
+('Andy', '99'),
+('Lily', '98'),
+('Lucy', '97');
+
+# 联合查询union
+select * from `t01` union select * from `t02`;
+select * from `t01` union distinct select * from `t02`; # 同上，默认去重
+select * from `t01` union all select * from `t02`; # 包括重复的数据
+
+# 查询的字段数量必须相同, 结构可以不同
+# 查询结果的字段，以前表为主
+select `id`, `name`, `score` from `t01` union distinct select `id`, `score`, `name` from `t02`;
+select `id`, `name`, `score` from `t01` union distinct select `id`, `name`, `classid` from `stu`;
+```
+
+- 联合查询排序
+	union的优先级高于`order by`
+
+```sql
+select * from t01 union select * from t02 order by age;
+```
+
+	如果需要针对`select`结果分别排序需要使用`limit`
+
+```sql
+# 无效
+(select * from t01 order by age desc) union (select * from t02 order by age);
+# 有效
+(select * from t01 order by age desc limit 9999) union (select * from t02 order by age limit 9999);
+```
+
+```sql
+# 联合查询的排序
+select * from `t01` union distinct select * from `t02` order by `score`;
+# 分别排序
+(select * from `t01` order by `score` desc limit 999) union distinct (select * from `t02` order by `score` limit 999);
+```
+
+## 2. 连接查询：内链接、外链接、交叉链接
+
+### a. 交叉连接：（笛卡尔积）
+
+```sql
+# 创建必须要表和数据
+create table `student` (
+	`id` int unsigned primary key auto_increment,
+	`stu_name` varchar(30) not null,
+	`lession_id` int unsigned
+);
+
+insert into `student` (`stu_name`, `lession_id`) values
+('Jack', '1'),
+('Rose', '2'),
+('Ben', '3'),
+('Lily', '4'),
+('Lucy', '5');
+
+create table `lession` (
+	`lession_id` int unsigned primary key auto_increment,
+	`lession_name` varchar(60) not null
+);
+
+insert into `lession` (`lession_name`) values
+('JavaSE'),
+('MySQL'),
+('JDBC'),
+('Javascript'),
+('Spring');
+
+# 交叉查询
+select * from `student`, `lession`;
+select `student`.`id`,
+`student`.`stu_name`,
+`lession`.`lession_id`, 
+`lession`.`lession_name`
+from `student`, `lession` where `student`.`lession_id` = `lession`.`lession_id`;
+```
+
+### b. 内连接：`inner join` - 将两张表根据指定的条件连接起来，严格连接
+- 内连接是将一张表的每一条记录去另外一张表根据条件匹配
+	- 匹配成功：保留连接的数据
+	- 匹配失败：左右表不保留 
+- 语法：`左表 join 右表 on 连接条件`
+
+```sql
+select t01.*, t02.name as newName from t01 inner join t02 on t01.kid = t02.id;
+```
+
+> 内连接可以使用where代替on
+
+```sql
+# 内连接（内连接和交叉连接效果一样，但内连接效率高一点点）
+select 
+`student`.`id`, 
+`student`.`stu_name`, 
+`lession`.`lession_id`, 
+`lession`.`lession_name`
+from `student` inner join `lession` on `student`.`lession_id` = `lession`.lession_id;
+```
+
+### c. 外连接：`outer join`是一种不严格的连接方式
+
+- 左连接：`left join` - 左表为主
+- 右连接：`right join` - 右表为主
+
+```sql
+select t01.*, t02.name as newName from t01 left join t02 on t01.kid = t02.id;
+select t01.*, t02.name as newName from t01 right join t02 on t01.kid = t02.id;
+```
+
+> 外连接不可以使用where代替on
+
+```sql
+# 外连接
+# 左连接，以左表为主，将左表所有数据显示出来，即使没有符合条件的数据
+select * from `student` left join `lession` on `student`.`lession_id` = `lession`.`lession_id`;
+# 右连接，以右表为主，将右表所有数据显示出来，即使没有符合条件的数据
+select * from `student` right join `lession` on `student`.`lession_id` = `lession`.`lession_id`;
+```
+
+### d. 自然连接：`natural join` - 是一种自动寻找连接条件的连接查询
+
+- 自然内连接：`natural join`
+- 自然外连接：`natural left/right join`
+- 自然连接条件匹配模式：自然寻找相同字段名称作为连接条件（字段名称相同）
+- 对表的结构设计要求极高
+
+```sql
+select * from t01 natural join t02;
+```
+
+> 一般没有人会用
+
+```sql
+# 自然连接
+select * from `student` natural join `lession`;
+```
+
+### e. using关键字：自然连接合并字段`using(字段名)`
+
+```sql
+# using关键字
+select * from `student` inner join `lession` using(`lession_id`);
+select * from `student` left join `lession` using(`lession_id`);
 ```
 
