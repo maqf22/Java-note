@@ -139,7 +139,7 @@ public class JDBCUtils {
         }
     }
 
-    // 私有化构造方，禁止实列化
+    // 私有化构造方法，禁止实列化
     private JDBCUtils() {
     }
 
@@ -210,5 +210,200 @@ public class JDBCUtilsTest {
 ```
 
 
+## 2. 通过单例模式封装
+
+```java
+package com.jdbc.demo05;
+
+import java.sql.*;
+
+public class JDBCUtilsSingle {
+    private JDBCUtilsSingle() {
+    }
+
+    private static JDBCUtilsSingle instance;
+    private static final String URL = "jdbc:mysql://localhost:3306/lx_java";
+    private static final String USER = "root";
+    private static final String PSW = "root";
+
+    static {
+        try {
+            DriverManager.registerDriver(new com.mysql.jdbc.Driver());
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static JDBCUtilsSingle getInstance() {
+        if (null == instance) {
+            instance = new JDBCUtilsSingle();
+        }
+        return instance;
+    }
+
+    public Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(URL, USER, PSW);
+    }
+
+    public void free(ResultSet res, Statement st, Connection conn) {
+        try {
+            if (null != res)
+                res.close();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            try {
+                if (null != st)
+                    st.close();
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            } finally {
+                try {
+                    if (null != conn)
+                        conn.close();
+                } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+    }
+}
+```
+
+```java
+package com.jdbc.demo04;
+
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+
+public class JDBCUtilsSingleTest {
+    public static void main(String[] args) throws SQLException {
+        JDBCUtilsSingle jdbc = JDBCUtilsSingle.getInstance();
+        Connection conn = jdbc.getConnection();
+        Statement st = conn.createStatement();
+        String sql = "select `id`, `name` from `teacher`";
+        ResultSet res = st.executeQuery(sql);
+        showRes(res);
+        jdbc.free(res, st, conn);
+    }
+
+    private static void showRes(ResultSet res) throws SQLException {
+        while (res.next()) {
+            System.out.println(
+                    res.getInt("id") + "\t" +
+                            res.getString("name")
+            );
+        }
+    }
+}
+```
 
 
+## 3. 增删改查
+
+```java
+package com.jdbc.demo05;
+
+import com.jdbc.demo04.JDBCUtilsSingle;
+
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+
+public class CRUD {
+    public static void Read(String sql) throws SQLException {
+        JDBCUtilsSingle jdbc = JDBCUtilsSingle.getInstance();
+        Connection conn = jdbc.getConnection();
+        Statement st = conn.createStatement();
+        ResultSet res = st.executeQuery(sql);
+        showRes(res);
+        jdbc.free(res, st, conn);
+    }
+
+    public static void CUD(String sql) throws SQLException {
+        JDBCUtilsSingle jdbc = JDBCUtilsSingle.getInstance();
+        Connection conn = jdbc.getConnection();
+        Statement st = conn.createStatement();
+        int i = st.executeUpdate(sql);
+        System.out.printf("%d行受影响", i);
+    }
+
+    private static void showRes(ResultSet res) throws SQLException {
+        while (res.next()) {
+            System.out.println(
+                    res.getInt("id") + "\t" +
+                            res.getString("name")
+            );
+        }
+    }
+}
+```
+
+```java
+package com.jdbc.demo05;
+
+import java.sql.SQLException;
+
+public class Main {
+    public static void main(String[] args) throws SQLException {
+        String sql = "select `id`, `name` from `teacher`";
+        CRUD.Read(sql);
+        /*String c = "insert into `teacher` (`name`) value ('Ms.Ma')";
+        CRUD.CUD(c);*/
+        /*String d = "delete from `teacher` where `id` = 3";
+        CRUD.CUD(d);*/
+        String u = "update `teacher` set `name` = 'Mr.OK' where `id` = 1";
+        CRUD.CUD(u);
+    }
+}
+```
+
+
+## 4. 防止SQL注入
+
+
+```java
+package com.jdbc.demo06;
+
+import com.jdbc.demo04.JDBCUtilsSingle;
+
+import java.sql.*;
+
+public class SQLTest {
+    public static void main(String[] args) throws SQLException {
+        // ReadByName("' or true or'");
+        ReadByName("Mr.OK");
+    }
+
+    public static void ReadByName(String name) throws SQLException {
+        JDBCUtilsSingle jdbc = JDBCUtilsSingle.getInstance();
+        Connection conn = jdbc.getConnection();
+        // 先定义要执行的sql语句，其中可以使用?占位符
+        String sql = "select `id`, `name` from `teacher` where `name` = ?";
+        // 使用定义好的sql语句来实例化pst对象，对sql做一个预处理（字符串化）
+        PreparedStatement pst = conn.prepareStatement(sql);
+        // 占位符绑定，表示给sql语句中的第一个占位符绑定一个指定的值
+        pst.setString(1, name);
+        // 通过pst对象去执行命令，此时executeQuery方法不需要参数，因为在预处理时已经指定了要执行的命令
+        ResultSet res = pst.executeQuery();
+        /*
+        Statement st = conn.createStatement();
+        ResultSet res = st.executeQuery(sql);
+        */
+        showRes(res);
+        jdbc.free(res, pst, conn);
+    }
+
+    private static void showRes(ResultSet res) throws SQLException {
+        while (res.next()) {
+            System.out.println(
+                    res.getInt("id") + "\t" +
+                            res.getString("name")
+            );
+        }
+    }
+}
+```
