@@ -174,5 +174,437 @@ public class BServlet extends HttpServlet {
 }
 ```
 
+- 案例：通过请求的转发来实现跳转 - （请求对象实现）
+
+```java
+请求对象.getRequestDispatcher("站内转发地址").forward(当前的请求对象, 当前的响应对象);
+```
+
+```java
+package com.servlet.demo;
+
+import javax.servlet.*;
+import javax.servlet.http.*;
+import java.io.IOException;
+import java.io.PrintWriter;
+
+public class CServlet extends HttpServlet {
+    @Override
+    protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+//        super.service(req, resp);
+        RequestDispatcher rd = req.getRequestDispatcher("/d.do");
+        rd.forward(req, resp);
+    }
+}
+```
+
+```java
+package com.servlet.demo;
+
+import javax.servlet.*;
+import javax.servlet.http.*;
+import java.io.IOException;
+import java.io.PrintWriter;
+
+public class DServlet extends HttpServlet {
+    @Override
+    protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+//        super.service(req, resp);
+        String info = req.getParameter("info");
+        resp.setContentType("text/html;charset=utf-8");
+        PrintWriter out = resp.getWriter();
+        out.print("<h2>" + info + "</h2>");
+    }
+}
+```
+
+- 重定向 与 请求转发 之间的关系
+	- 前提：通常同某一次请求可能会需要多个Servlet来协同完成某一项工作，那么这个工作是让用户一个一个的去发送请求。
+	- 重定向：（请求方式：GET）
+		- 响应对象.sendRedirect("url地址")，注意：通过重定向方式的跳转，地址栏会随之发生变化
+		- 可以跳转的范围
+			- 站内URI（/网站名/静太(动态)资源文件名）
+			- 站外URL（https:// 完整的访问域名）
+		- 请求转发：（请求方式：根据原始的请求方式来决定）
+			- 只能在站内进行跳转（不可转发到站外）
+			- 不适用请求转发的几种场景（以下三种场景适合重定向最实用的三种场景）
+				- 添加之后的查询功能
+				- 删除之后的查询功能
+				- 修改之后的查询功能
+
+```java
+RequestDispatcher report = 请求对象名.getRequestDispatcher("uri地址");
+report.forward(当前的请求对象, 当前的响应对象)；
+```
+
+
+## 2. HttpServletRequest - 请求对象
+
+- 获取请求行中的一些内容
+
+```java
+package com.servlet.demo;
+
+import javax.servlet.*;
+import javax.servlet.http.*;
+import java.io.IOException;
+import java.io.PrintWriter;
+
+public class EServlet extends HttpServlet {
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+//        super.doGet(req, resp);
+        String param = req.getParameter("param");
+        String URI = req.getRequestURI();
+        StringBuffer URL = req.getRequestURL();
+        String method = req.getMethod();
+        resp.setContentType("text/html;charset=utf-8");
+        PrintWriter out = resp.getWriter();
+        out.print("<h2>" + param + "</h2><hr/>");
+        out.print("<h2>" + URI + "</h2><hr/>");
+        out.print("<h2>" + URL + "</h2><hr/>");
+        out.print("<h2>" + method + "</h2><hr/>");
+    }
+}
+```
+
+- 获取请求包中的一些内容
+
+```java
+package com.servlet.demo;
+
+import javax.servlet.*;
+import javax.servlet.http.*;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.Enumeration;
+
+public class FServlet extends HttpServlet {
+    @Override
+    protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+//        super.service(req, resp);
+        if (req.getMethod().equals("POST"))
+            req.setCharacterEncoding("utf-8");
+        resp.setContentType("text/html;charset=utf-8");
+        Enumeration<String> paramKeys = req.getParameterNames();
+        PrintWriter out = resp.getWriter();
+        while (paramKeys.hasMoreElements()) {
+            String key = paramKeys.nextElement();
+            String value = req.getParameter(key);
+            String res = "key: " + key + "<br/>" + "value: " + value + "<br/>";
+            out.print(res);
+        }
+    }
+}
+```
+
+- 获取多个值
+
+```html
+<form action="/myweb/g.do" method="post">  
+    code <input type="checkbox" name="hobby" value="0"/>  
+    print <input type="checkbox" name="hobby" value="1"/>  
+    read <input type="checkbox" name="hobby" value="2"/>  
+    <button>submit</button>  
+</form>
+```
+
+```java
+package com.servlet.demo;
+
+import javax.servlet.*;
+import javax.servlet.http.*;
+import java.io.IOException;
+import java.io.PrintWriter;
+
+public class GServlet extends HttpServlet {
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+//        super.doPost(req, resp);
+        String[] values = req.getParameterValues("hobby");
+        resp.setContentType("text/html;charset=utf-8");
+        PrintWriter out = resp.getWriter();
+        for (String value : values) {
+            out.print(value + "<br/>");
+        }
+    }
+}
+```
+
+> request 请求对象的生命周期
+> - 创建时机：在Tomcat接收到请求，调用doGet/doPost/service等对应响应方法的时候被创建，然后这个响应对象会被自动传递给对应的响应方法
+> - 销毁时机：当响应方法调用结束之后，意味着本次的请求已经处理完毕，在Tomcat负责推送响应包之前，销毁掉请求对象
+
+- HTTP服务器状态码：
+	- 100：通知浏览器，服端本次返回的资源文件不是一个完整的资源文件，需浏览器对服务器继续发送请求来获取当前请求所需的其他文件或相关联的资源文件
+	- 200：正常
+	- 302：通知浏览器不需要读取响应体中的内容，此时在响应头存在一个Location属性，要求浏览器根据Location属性的地址向服务器发起resp.sendRedirect(url)请求。（重定向）
+	- 404：没有找到目录资源文件
+	- 405：当前Servlet无法对当前的请求方式进行处理（请求方式有问题）
+	- 500：本次要访问的Servlet进行处理时，产生了Java异常（服务端错误）
+
+
+## 3. ServletContext接口
+
+- 全局作用域对象，通过该对象创建的数据可以在多个Servlet中进行共享
+- 生命周期
+	- Tomcat启动的时候，自动创建一个全局作用域对象
+	- 一个网站项目有且只有一个全局作用域对象
+	- Tomcat关闭时自动销毁
+
+```java
+package com.servlet.demo;
+
+import javax.servlet.*;
+import javax.servlet.http.*;
+import java.io.IOException;
+
+public class ServletA extends HttpServlet {
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+//        super.doGet(req, resp);
+        ServletContext context = req.getServletContext();
+        context.setAttribute("Teacher", "Lily");
+        context.setAttribute("Student", "Jack");
+    }
+}
+```
+
+```java
+package com.servlet.demo;
+
+import javax.servlet.*;
+import javax.servlet.http.*;
+import java.io.IOException;
+import java.io.PrintWriter;
+
+public class ServletB extends HttpServlet {
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+//        super.doGet(req, resp);
+        ServletContext context = req.getServletContext();
+        String teacher = null;
+        String student = null;
+        resp.setContentType("text/html;charset=utf-8");
+        PrintWriter out = resp.getWriter();
+        try {
+            teacher = context.getAttribute("Teacher").toString();
+            student = context.getAttribute("Student").toString();
+            out.print("<h3>" + teacher + "</h3>");
+            out.print("<h3>" + student + "</h3>");
+        } catch (Exception e) {
+//            throw new RuntimeException(e);
+            out.print("<h3>NullPointerException</h3>");
+        }
+    }
+}
+```
+
+
+## 4. Cookie工具类
+
+- 一个可以实现数据共享的工具类，cookie是存储在浏览器端的数据共享介质
+
+```java
+package com.servlet.demo;
+
+import javax.servlet.*;
+import javax.servlet.http.*;
+import java.io.IOException;
+
+public class ServletC extends HttpServlet {
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+//        super.doGet(req, resp);
+        Cookie userNameCookie = new Cookie("username", "admin");
+        Cookie passwordCookie = new Cookie("password", "123456");
+        userNameCookie.setMaxAge(60);
+        passwordCookie.setMaxAge(30);
+        resp.addCookie(userNameCookie);
+        resp.addCookie(passwordCookie);
+    }
+}
+```
+
+```java
+package com.servlet.demo;
+
+import javax.servlet.*;
+import javax.servlet.http.*;
+import java.io.IOException;
+import java.io.PrintWriter;
+
+public class ServletD extends HttpServlet {
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+//        super.doGet(req, resp);
+        resp.setContentType("text/html;charset=utf-8");
+        PrintWriter out = resp.getWriter();
+        Cookie[] cookies = req.getCookies();
+        if (null == cookies) {
+            out.print("<p>no cookie</p>");
+            return;
+        }
+        for (Cookie cookie : cookies) {
+            String name = cookie.getName();
+            String value = cookie.getValue();
+            out.print("<p>" + name + " => " + value + "</p>");
+        }
+    }
+}
+```
+
+
+## 5. HttpSession接口
+
+- 一个可以实现数据共享的工具类，session是存储在服务器端的数据共享介质
+
+```java
+package com.servlet.demo;
+
+import javax.servlet.*;
+import javax.servlet.http.*;
+import java.io.IOException;
+
+public class ServletE extends HttpServlet {
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+//        super.doGet(req, resp);
+        HttpSession session = req.getSession();
+        session.setAttribute("username", "admin");
+        session.setAttribute("password", "123456");
+    }
+}
+```
+
+```java
+package com.servlet.demo;
+
+import javax.servlet.*;
+import javax.servlet.http.*;
+import java.io.IOException;
+import java.io.PrintWriter;
+
+public class ServletF extends HttpServlet {
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+//        super.doGet(req, resp);
+        HttpSession session = req.getSession();
+        String username = null;
+        String password = null;
+        resp.setContentType("text/html;charset=utf-8");
+        PrintWriter out = resp.getWriter();
+        try {
+            username = session.getAttribute("username").toString();
+            password = session.getAttribute("password").toString();
+            out.print("<p>" + username + " => " + password + "</p>");
+        } catch (Exception e) {
+//            throw new RuntimeException(e);
+            out.print("<p>no session</p>");
+        }
+    }
+}
+```
+
+- Cookie和Session对比
+
+&nbsp;| 存储位置 | 存储量 | 数据类型 | 应用场景
+ :- | :- | :- | :- | :-
+ Cookie | 客户端 | 一个键值对 | 只能String | 记住用户名
+ Session | 服务端 | 任意数量的键值对 | 任意数据类型 | 较私密的数据
+
+- Session的生命周期
+	- 默认情况下：Session的有效时长（最大闲置时间）是30分钟
+	- 手动设置：项目的核心配置文件web.xml，设置最大闲置时长为10分钟
+
+```xml
+<session-config>
+	<session-timeout>10</session-timeout>
+</session-config>
+```
+
+
+## 6. Listener监听接口
+
+- 用来监听Servlet规范中作用域对象盛行周期以及共享数据的变化
+- 没有现成的方法，需要自己的实现接口
+- 监听器实现类的开发步骤
+	1. 根据我们要监听的内容来选择一个对应的接口类来进行实现
+	2. 重写该接口中的监听处理函数
+	3. 项目核心配置文件web.xml中进行注册
+
+```java
+package com.servlet.demo;
+
+import javax.servlet.*;
+import javax.servlet.http.*;
+
+public class Listener implements ServletContextListener, HttpSessionListener, HttpSessionAttributeListener {
+
+    public Listener() {
+    }
+
+    @Override
+    public void contextInitialized(ServletContextEvent sce) {
+        /* This method is called when the servlet context is initialized(when the Web application is deployed). */
+        System.out.println("ServletContext对象被创建了！");
+    }
+
+    @Override
+    public void contextDestroyed(ServletContextEvent sce) {
+        /* This method is called when the servlet Context is undeployed or Application Server shuts down. */
+        System.out.println("ServletContext对象被销毁了！");
+    }
+
+    @Override
+    public void sessionCreated(HttpSessionEvent se) {
+        /* Session is created. */
+    }
+
+    @Override
+    public void sessionDestroyed(HttpSessionEvent se) {
+        /* Session is destroyed. */
+    }
+
+    @Override
+    public void attributeAdded(HttpSessionBindingEvent sbe) {
+        /* This method is called when an attribute is added to a session. */
+    }
+
+    @Override
+    public void attributeRemoved(HttpSessionBindingEvent sbe) {
+        /* This method is called when an attribute is removed from a session. */
+    }
+
+    @Override
+    public void attributeReplaced(HttpSessionBindingEvent sbe) {
+        /* This method is called when an attribute is replaced in a session. */
+    }
+}
+```
+
+- 应用场景（数据库的连接池connect pool）
+
+> 在我们使用Java对数据库进行操作的时候，需要创建数据库的连接，不适用的时候还需要对数据库的连接进行关闭和资源释放。那么其实创建连接和释放资源的过程是非常影响我们对数据库操作的效率的。通常响应时长都很久。假设一个次建立连接和释放连接资源的总时间为30ms，那么我们做10次查询，就要耗费300ms。很多时候我们的操作非常频繁。那么就需要用数据库连接池相关的方式来解决。
+> ServletContext监听是从Tomcat启动开始，到关闭结束。所以可以在Tomcat启动时候就创建好很多的数据库连接，等着Servlet来使用。使用结束之后也进行关闭操作，在还给数据连接池，等待其他servlet来进行使用
+
+
+## 7. Filter过滤接口
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
