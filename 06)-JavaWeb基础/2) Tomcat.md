@@ -591,8 +591,58 @@ public class Listener implements ServletContextListener, HttpSessionListener, Ht
 
 ## 7. Filter过滤接口
 
+- 在Tomcat调用资源文件之前，对Tomcat进行拦截
+- Filter当中的实现类同样也是需要自主开发
+- 为什么要进行Tomcat拦截
+	- 为了帮助Tomcat检测当前的请求是否合法
+	- 可以对当前的请求做增强的操作（预处理）
+- 实现一个过滤器的步骤
+	1. 创建一实现类
+	2. 重写Filter接口中的方法（doFilter方法）
+	3. 在网站核心配置文件web.xml中注册
 
+```java
+package com.servlet.demo;
 
+import javax.servlet.*;
+import java.io.IOException;
+import java.io.PrintWriter;
+
+public class Filter01 implements Filter {
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws ServletException, IOException {
+        String age = request.getParameter("age");
+        if (null == age) {
+            response.setContentType("text/html;charset=utf-8");
+            PrintWriter out = response.getWriter();
+            out.print("<h2>age param error</h2>");
+            return;
+        }
+        if (Integer.valueOf(age) < 18) {
+            response.setContentType("text/html;charset=utf-8");
+            PrintWriter out = response.getWriter();
+            out.print("<h2>too young</h2>");
+        } else if (Integer.valueOf(age) > 70) {
+            response.setContentType("text/html;charset=utf-8");
+            PrintWriter out = response.getWriter();
+            out.print("<h2>too old</h2>");
+        } else {
+            chain.doFilter(request, response); // 放行
+        }
+    }
+}
+```
+
+```xml
+<filter>
+	<filter-name>Filter</filter-name>
+	<filter-class>com.servlet.demo.Filter01</filter-class>
+</filter>
+<filter-mapping>
+	<filter-name>Filter</filter-name>
+	<url-pattern>/pic.jpeg</url-pattern>
+</filter-mapping>
+```
 
 
 
