@@ -114,6 +114,215 @@ https://developer.aliyun.com/
 
 # 四、Maven操作入门
 
+## 1. 手动创建
+
+1. 根据结构创建对应的目录
+	- project-java
+		- src
+			- main
+				- java
+				- resources
+			- test
+				- java
+				- resources
+		- pom.xml
+
+>main/java/com.maqf.demo/Demo.java
+
+```java
+package com.maqf.demo;
+
+public class Demo {
+	public String hello(String name) {
+		String res = "Hello" + name;
+		System.out.println(res);
+		return res;
+	}
+}
+```
+
+> test/java/com.maqf.demo/DemoTest.java
+
+```java
+package com.maqf.demo;
+
+import org.junit.Test;
+import org.junit.Assert;
+
+public class DemoTest {
+	@Test
+	public void testHello() {
+		Demo d = new Demo();
+		String ret = d.hello("Jack");
+		Assert.assertEquals("HelloJack", ret);
+	}
+}
+```
+
+> pom.xml
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project
+	xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+	
+	<modelVersion>4.0.0</modelVersion>
+	
+	<groupId>com.maqf.demo</groupId>
+	<artifactId>project-java</artifactId>
+	<version>1.0</version>
+	<packaging>jar</packaging>
+	
+	<dependencies>
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<version>4.12</version>
+		</dependency>
+	</dependencies>
+</project>
+```
+
+- 相关命令
+
+命令 | 说明
+:- | :-
+mvn compile | 编译项目
+mvn clean | 清理项目
+mvn test | 测试项目
+mvn package | 打包项目
+mvn install | 安装到本地仓库
 
 
+## 2. 通过插件自动创建
+
+- 创建工程语法
+
+```bat
+mvn archetype:generate 
+-DgroupId=包名
+-DartifactId=项目名 
+-DarchetypeArtifactId=maven-archetype-quickstart 
+-Dversion=0.0.1-snapshot 
+-DinteractiveMode=false
+```
+
+- 创建Java工程
+
+```bat
+mvn archetype:generate -DgroupId=com.xuexi -DartifactId=web-project -DarchetypeArtifactId=maven-archetype-quickstart -Dversion=0.0.1-snapshot -DinteractiveMode=false
+```
+
+- 创建 JavaWeb工程
+
+```bat
+mvn archetype:generate -DgroupId=com.xuexi -DartifactId=web-project -DarchetypeArtifactId=maven-archetype-webapp -Dversion=0.0.1-snapshot -DinteractiveMode=false
+```
+
+## 3. IDEA中使用Maven 
+
+- 添加Java工程
+	1. 添加模块时选择Maven
+- 添加JavaWeb工程
+	1. 添加模块时选择JavaEE
+
+> 注意：File -> Settings -> Build, Execution, Deployment -> Build Tools -> Maven 设置成自己安装的Maven及配置文件和repository。
+
+
+# 五、依赖管理
+
+## 1. 依赖配置
+
+> 依赖当前项目所需要的jar包，一个项目可以设置多个依赖
+
+```xml
+<!-- 设置当前项目所需要的所有jar包 -->
+<dependencies>
+	<!-- 设置具体的依赖 -->
+	<dependency>
+		<!-- 依赖所属级 -->
+		<groupId>org.junit.jupiter</groupId>
+		<!-- 依赖所项目ID -->
+		<artifactId>junit-jupiter-engine</artifactId>
+		<!-- 依赖版本号 -->
+		<version>${junit.version}</version>
+	</dependency>
+</dependencies>
+```
+
+## 2. 依赖传递
+
+就近原则
+- 路径就近：层级越近的优先级越高
+- 声明就近：同级的越先声明就优先级越高
+- 特殊覆盖：同一个依赖关系中，后设置的会覆盖之前的
+
+## 3. 可选依赖
+
+```xml
+<dependency>
+	<groupId>org.junit.jupiter</groupId>
+	<artifactId>junit-jupiter-engine</artifactId>
+	<version>${junit.version}</version>
+	<!-- false表示不隐藏，true表示隐藏（不被别人依赖） -->
+	<optional>true</optional>
+</dependency>
+```
+
+## 4. 排除依赖
+
+```xml
+<dependency>
+	<groupId>org.junit.jupiter</groupId>
+	<artifactId>junit-jupiter-engine</artifactId>
+	<version>${junit.version}</version>
+	<!-- 不使用其他jar中的依赖 -->
+	<exclusions>
+		<exclusion>
+			<groupId>xxx</groupId>
+			<artifacId>xxx</artifacId>
+		</exclusion>
+	</exclusions>
+</dependency>
+```
+
+## 5. 依赖范围
+
+> 依赖的jar包默认情况下可以使用在任何位置，通过scope标签定义作用范围
+
+```xml
+<dependency>
+	<groupId>org.junit.jupiter</groupId>
+	<artifactId>junit-jupiter-engine</artifactId>
+	<version>${junit.version}</version>
+	<!-- 定义作用范围 -->
+	<scope>test</scope>
+</dependency>
+```
+
+- 作用范围
+	- 主程序范围有效（main目录）
+	- 测试程序范围有效（test目录）
+	- 是否参与打包（package指令）
+
+scope | main目录 | test目录 | 打包 | 例子
+:- | :- | :- | :- | :-
+compile（默认）| 有效 | 有效 | 有效 | log4j
+test | | 有效 | | junit
+provided | 有效 | 有效 | | servlet-api
+runtime | | | 有效 | jdbc
+
+## 6. 依赖范转传递
+
+> 带有依赖范围的资源在进行递时，作用范围参考如下
+> 横向为直接依赖，纵向为直接依赖的直接依赖
+
+&nbsp; | compile | test | provided | runtime
+:- | :- | :- | :- | :-
+complie | compile | test | provided | runtime
+test | 无 | 无 | 无 | 无
+provided | 无 | 无 | 无 | 无
+runtime | runtime | test | provided | runtime
 
