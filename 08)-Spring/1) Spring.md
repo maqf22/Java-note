@@ -185,6 +185,7 @@ public class StuDaoImpl implements StuDao {
 }
 ```
 
+
 ## 2. \<bean\>作用范围配置
 
 ### a. singleton
@@ -204,6 +205,7 @@ public class StuDaoImpl implements StuDao {
 	- 对象的创建：调用`getBean()`
 	- 对象的运行：只要容器在，对象就一直存在
 	- 对象的销毁：对象长时间不使用，JVM会自动回收
+
 
 ## 3. \<bean\>生命周期配置
 
@@ -284,6 +286,7 @@ public class StuTest {
 }
 ```
 
+
 ## 4. \<bean\>实例化的方式
 
 ### a. 无参构造方法实例化
@@ -295,8 +298,701 @@ public class StuTest {
 1. 创建一个工厂静态方法
 
 ```java
+package com.maqf.factory;
 
+import com.maqf.dao.StuDao;
+import com.maqf.dao.impl.StuDaoImpl;
+
+/**
+ * @ClassName MyFactory
+ * @Description: TODO
+ * @Author: maqf22@qq.com
+ */
+public class MyFactory {
+    public static StuDao getStuDao() {
+        return new StuDao() {
+            @Override
+            public void show() {
+                System.out.println("StuDao匿名内部类");
+            }
+        };
+    }
+}
+```
+
+2. 调整配置文件
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean id="StuDao" class="com.maqf.factory.MyFactory" factory-method="getStuDao"></bean>
+
+</beans>
+```
+
+### c. 工厂实例方法实例化
+
+1. 在`MyFactory`类中添加普通的成员方法
+
+```java
+package com.maqf.factory;
+
+import com.maqf.dao.StuDao;
+import com.maqf.dao.impl.StuDaoImpl;
+
+/**
+ * @ClassName MyFactory
+ * @Description: TODO
+ * @Author: maqf22@qq.com
+ */
+public class MyFactory {
+    public StuDao getStuDaoObj() {
+        return new StuDaoImpl();
+    }
+}
+```
+
+2. 调整配置文件
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean id="MyFactory" class="com.maqf.factory.MyFactory"></bean>
+    <bean id="StuDao" factory-bean="MyFactory" factory-method="getStuDaoObj"></bean>
+
+</beans>
 ```
 
 
+## 5. \<bean\>依赖注入
+
+### a. 通过set方法
+
+1. 创建service包，并在其中创建StuService接口
+
+```java
+package com.maqf.dao;  
+  
+/**  
+ * @ClassName StuService  
+ * @Description: TODO  
+ * @Author: maqf22@qq.com  
+ */public interface StuService {  
+    void show();  
+}
+```
+
+2. 在service包中创建Impl包，并在其中创建StuServiceImpl实类
+
+```java
+package com.maqf.dao.impl;
+
+import com.maqf.dao.StuDao;
+import com.maqf.dao.StuService;
+
+/**
+ * @ClassName StuServiceImpl
+ * @Description: TODO
+ * @Author: maqf22@qq.com
+ */
+public class StuServiceImpl implements StuService {
+    private StuDao stuDao;
+
+    public void setStuDao(StuDao stuDao) {
+        this.stuDao = stuDao;
+    }
+
+    @Override
+    public void show() {
+        stuDao.show();
+        System.out.println("StuService show running~");
+    }
+}
+```
+
+3. 调整核心配置文件
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean id="StuDao" class="com.maqf.dao.impl.StuDaoImpl"></bean>
+    <bean id="StuDaoService" class="com.maqf.dao.impl.StuServiceImpl">
+        <property name="stuDao" ref="StuDao"/>
+    </bean>
+
+</beans>
+```
+
+4. 测试类中添加测试方法并测试
+
+```java
+@Test
+public void test03() {
+        ClassPathXmlApplicationContext app = new ClassPathXmlApplicationContext("ApplicationContext.xml");
+        StuServiceImpl bean = app.getBean(StuServiceImpl.class);
+        bean.show();
+}
+```
+
+### b. 通过带参构造方法
+
+1. 修改StuServiceImpl类，添加带参构造方法，同时手动添加无参构造方法
+
+```java
+package com.maqf.dao.impl;
+
+import com.maqf.dao.StuDao;
+import com.maqf.dao.StuService;
+
+/**
+ * @ClassName StuServiceImpl
+ * @Description: TODO
+ * @Author: maqf22@qq.com
+ */
+public class StuServiceImpl implements StuService {
+    private StuDao stuDao;
+
+    public StuServiceImpl() {
+    }
+
+    public StuServiceImpl(StuDao stuDao) {
+        this.stuDao = stuDao;
+    }
+
+    @Override
+    public void show() {
+        stuDao.show();
+        System.out.println("StuService show running~");
+    }
+}
+```
+
+2. 调整核心配置文件
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean id="stuDao" class="com.maqf.dao.impl.StuDaoImpl"></bean>
+    <bean id="suDaoService" class="com.maqf.dao.impl.StuServiceImpl">
+        <constructor-arg name="stuDao" ref="stuDao"/>
+    </bean>
+
+</beans>
+```
+
+3. 测试
+
+
+## 6. \<bean\>依赖注入类型
+
+### a. 引用数据类型
+
+略。
+
+### b. 普通数据类型
+
+1. 修改StuDaoImpl源码文件
+
+```java
+package com.maqf.dao.impl;
+
+import com.maqf.dao.StuDao;
+
+/**
+ * @ClassName StuDaoImpl
+ * @Description: TODO
+ * @Author: maqf22@qq.com
+ */
+public class StuDaoImpl implements StuDao {
+    private String stuName;
+    private int age;
+    private float score;
+
+    public StuDaoImpl() {
+    }
+
+    public String getStuName() {
+        return stuName;
+    }
+
+    public void setStuName(String stuName) {
+        this.stuName = stuName;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    public float getScore() {
+        return score;
+    }
+
+    public void setScore(float score) {
+        this.score = score;
+    }
+
+    @Override
+    public void show() {
+        System.out.printf("name: %s, age: %d, score: %.2f\n", this.stuName, this.age, this.score);
+    }
+}
+```
+
+2. 调整核心配置文件
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean id="stuDao" class="com.maqf.dao.impl.StuDaoImpl">
+        <property name="stuName" value="Jack"></property>
+        <property name="age" value="29"></property>
+        <property name="score" value="99.5"></property>
+    </bean>
+    <bean id="suDaoService" class="com.maqf.dao.impl.StuServiceImpl">
+        <constructor-arg name="stuDao" ref="stuDao"/>
+    </bean>
+
+</beans>
+```
+
+### c. 集合数据类型
+
+1.  修改StuDaoImpl源码文件
+
+```java
+package com.maqf.dao.impl;
+
+import com.maqf.dao.StuDao;
+import com.maqf.global.Student;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+
+/**
+ * @ClassName StuDaoImpl
+ * @Description: TODO
+ * @Author: maqf22@qq.com
+ */
+public class StuDaoImpl implements StuDao {
+    private String stuName;
+    private int age;
+    private float score;
+
+    private List<String> strList;
+    private Map<String, Student> stuMap;
+    private Properties prop;
+
+    public List<String> getStrList() {
+        return strList;
+    }
+
+    public void setStrList(List<String> strList) {
+        this.strList = strList;
+    }
+
+    public Map<String, Student> getStuMap() {
+        return stuMap;
+    }
+
+    public void setStuMap(Map<String, Student> stuMap) {
+        this.stuMap = stuMap;
+    }
+
+    public Properties getProp() {
+        return prop;
+    }
+
+    public void setProp(Properties prop) {
+        this.prop = prop;
+    }
+
+    public StuDaoImpl() {
+    }
+
+    public String getStuName() {
+        return stuName;
+    }
+
+    public void setStuName(String stuName) {
+        this.stuName = stuName;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    public float getScore() {
+        return score;
+    }
+
+    public void setScore(float score) {
+        this.score = score;
+    }
+
+    @Override
+    public void show() {
+        System.out.printf("name: %s, age: %d, score: %.2f\n", this.stuName, this.age, this.score);
+        System.out.println("list:" + this.strList);
+        System.out.println("map:" + this.stuMap);
+        System.out.println("properties:" + this.prop);
+    }
+}
+
+```
+
+2. 修改核心配置文件
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean id="stu01" class="com.maqf.global.Student">
+        <property name="name" value="Lily"/>
+        <property name="age" value="19"/>
+        <property name="score" value="86.5"/>
+    </bean>
+    <bean id="stu02" class="com.maqf.global.Student">
+        <property name="name" value="Ben"/>
+        <property name="age" value="21"/>
+        <property name="score" value="89"/>
+    </bean>
+    <bean id="stuDao" class="com.maqf.dao.impl.StuDaoImpl">
+        <property name="stuName" value="Jack"></property>
+        <property name="age" value="29"></property>
+        <property name="score" value="99.5"></property>
+        <property name="strList">
+            <list>
+                <value>Jack</value>
+                <value>Rose</value>
+            </list>
+        </property>
+        <property name="stuMap">
+            <map>
+                <entry key="one" value-ref="stu01"/>
+                <entry key="two" value-ref="stu02"/>
+            </map>
+        </property>
+        <property name="prop">
+            <props>
+                <prop key="01">first</prop>
+                <prop key="02">second</prop>
+            </props>
+        </property>
+    </bean>
+    <bean id="suDaoService" class="com.maqf.dao.impl.StuServiceImpl">
+        <constructor-arg name="stuDao" ref="stuDao"/>
+    </bean>
+
+</beans>
+```
+
+
+## 7. 导入其他配置
+
+```xml
+<import resource="Student.xml"/>
+```
+
+
+# 四、配置数据源
+
+## 1. 数据源简介
+
+> 数据源（连接池）的作用是提高程序的性能
+> 常见的数据源：C3P0 / Druid / DBCP / BoneCP
+
+
+## 2. 数据源的使用
+
+### a. 手动创建数据源测试
+
+1. 导入数据源的坐标和数据库坐标
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.maqf</groupId>
+    <artifactId>SpringDemo-02-ANNO</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <name>SpringDemo-02-ANNO</name>
+    <packaging>war</packaging>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <junit.version>5.9.1</junit.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <version>4.0.1</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/org.springframework/spring-context -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+            <version>5.3.20</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/mysql/mysql-connector-java -->
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>5.1.49</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/com.mchange/c3p0 -->
+        <dependency>
+            <groupId>com.mchange</groupId>
+            <artifactId>c3p0</artifactId>
+            <version>0.9.5.2</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/com.alibaba/druid -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>druid</artifactId>
+            <version>1.2.8</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>3.3.2</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+```
+
+2. 创建数据源（连接池）对象，设置连接信息、输出、关闭！
+
+```java
+package com.maqf.runTest;
+
+import com.alibaba.druid.pool.DruidDataSource;
+import com.alibaba.druid.pool.DruidPooledConnection;
+import com.mchange.v2.c3p0.ComboPooledDataSource;
+import org.junit.jupiter.api.Test;
+
+import java.beans.PropertyVetoException;
+import java.sql.Connection;
+import java.sql.SQLException;
+
+/**
+ * @ClassName Test
+ * @Description: TODO
+ * @Author: maqf22@qq.com
+ */
+public class AnnoTest {
+    private static final String MYSQL_DRIVER = "com.mysql.jdbc.Driver";
+    private static final String MYSQL_URL = "jdbc:mysql://127.0.0.1:3306/lx_java";
+    private static final String MYSQL_USER = "root";
+    private static final String MYSQL_PASSWORD = "root";
+
+    @Test
+    public void c3p0Test() throws SQLException, PropertyVetoException {
+        ComboPooledDataSource dataSource = new ComboPooledDataSource();
+        dataSource.setDriverClass(MYSQL_DRIVER);
+        dataSource.setJdbcUrl(MYSQL_URL);
+        dataSource.setUser(MYSQL_USER);
+        dataSource.setPassword(MYSQL_PASSWORD);
+        Connection conn = dataSource.getConnection();
+        System.out.println(conn);
+        conn.close();
+    }
+
+    @Test
+    public void druidTest() throws SQLException {
+        DruidDataSource dataSource = new DruidDataSource();
+        dataSource.setDriverClassName(MYSQL_DRIVER);
+        dataSource.setUrl(MYSQL_URL);
+        dataSource.setUsername(MYSQL_USER);
+        dataSource.setPassword(MYSQL_PASSWORD);
+        DruidPooledConnection conn = dataSource.getConnection();
+        System.out.println(conn);
+        conn.close();
+    }
+}
+```
+
+### b. 通过Spring创建数据源测试
+
+1. `pom.xml`中导入Spring坐标
+
+```xml
+<!-- https://mvnrepository.com/artifact/org.springframework/spring-context -->
+<dependency>
+	<groupId>org.springframework</groupId>
+	<artifactId>spring-context</artifactId>
+	<version>5.3.20</version>
+</dependency>
+```
+
+2. `test/resources`中创建`ApplicationContext.xml`核心配置文件并添加内容
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource">
+        <property name="driverClassName" value="com.mysql.jdbc.Driver"/>
+        <property name="url" value="jdbc:mysql://127.0.0.1:3306/lx_java"/>
+        <property name="username" value="root"/>
+        <property name="password" value="root"/>
+    </bean>
+
+</beans>
+```
+
+3. `test/java/DataSource.java`文件中添加
+
+```java
+@Test
+public void druidTest02() throws SQLException {
+	ClassPathXmlApplicationContext app = new ClassPathXmlApplicationContext("ApplicationContext.xml");
+	DataSource dataSource = (DataSource) app.getBean("dataSource");
+	Connection conn = dataSource.getConnection();
+	System.out.println(conn);
+	conn.close();
+}
+```
+
+### c. 通过Properties创建数据源测试
+
+1. 在`test/resources`目录中创建 `jdbc.properties`文件并添加配置信息
+
+```properties
+MYSQL_DRIVER=com.mysql.jdbc.Driver
+MYSQL_URL=jdbc:mysql://127.0.0.1:3306/lx_java
+MYSQL_USER=root
+MYSQL_PASSWORD=root
+```
+
+2. 修改`ApplicationContext.xml`核心配置文件如下，添加`:context`命名空间
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="
+       http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/context
+       http://www.springframework.org/schema/context/spring-context.xsd">
+
+    <context:property-placeholder location="classpath:jdbc.properties"/>
+    <bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource">
+        <property name="driverClassName" value="${MYSQL_DRIVER}"/>
+        <property name="url" value="${MYSQL_URL}"/>
+        <property name="username" value="${MYSQL_USER}"/>
+        <property name="password" value="${MYSQL_PASSWORD}"/>
+    </bean>
+
+</beans>
+```
+
+3. 运行测试
+
+
+# 五、Spring注解开发
+
+## 1. Spring原始注解
+
+> Spring原始注解主要用于替代`<bean>`标签的配置
+
+注解名 | 说明
+:- | :-
+@Component | 使用在类上，用来实例化`<bean>`
+**@Controller** | 同上 - Web层控制器
+**@Service** | 同上 - Service层
+**@Repository** | 同上- Dao层
+@Autowired | 使用在字段上用于根据类型依赖注入（引用数据类型）
+@Qualifier | 集合@Autowried一起使用，用于根据名称进行依赖注入
+**@Resource** | 等价于@Autowried + @Qualifier，按照名称进行注入
+**@Value** | 注入普通属性
+**@Scope** | 标注作用范围
+@PostConstruct | 使用在方法上，标注初始化方法
+@PreDestory | 使用在方法上，标注销毁方法
+
+1. 准备工作（同上）
+
+![[Pasted image 20230219174202.png]]
+
+2. 使用注解替换配置文件
+
+	1. 替换`<bean id="stuDao" class="com.maqf.dao.impl.StuDaoImpl"/>`：在StuDaoImpl类上面添加注解@Component("stuDao")
+	2. 替换`<bean id="stuService" class="com.maqf.service.impl.StuServiceImpl">    <property name="stuDao" ref="stuDao"/></bean>`：在StuServiceImpl类上添加@Component("stuService")，`private StuDao stuDao;`上添加@AutoWired和@Qualifier("stuDao")或直接添加@Resource(name="stuDao")
+	3. 在`ApplicationContext.xml`核心配置文件中添加注解组件扫描：`<context:component-scan base-package="com.maqf"/>`
+	4. 注入基本数据类型的属性
+
+```java
+@Value("Jack")  
+private String stuName;
+```
+
+		5. 设置Scope
+
+```java
+// 在类前添加
+@Scope("prototype")
+```
+
+		6. 设置初始化和销毁方式
+
+```java
+// 在类前添加
+@PostConstruct // 初始化方法
+// 或者
+@PreDestory // 销毁方法
+```
 
