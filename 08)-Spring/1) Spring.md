@@ -996,3 +996,165 @@ private String stuName;
 @PreDestory // 销毁方法
 ```
 
+
+## 2. Spring新注解
+
+用来替代XML中其他配置内容如下：
+1. 非自定义的`<bean>`
+2. 加载`properties`文件的配置`<context:property-placeholder>`
+3. 组件扫描配置`<context:component-scan>`
+4. 配置文件的引入`<import>`
+
+注解名 | 说明
+:- | :-
+@Configuration | 用于指定当前类是一个Spring配置类，当创建容器是从该类上加载注解
+@ComponentScan | 用于指定Spring在初始化容器是要扫描包
+@Bean | 使用在方法上，标注该方法的返回值存储到Spring容器中
+@PropertySource | 加载Properties配置文件
+@Import | 导入其他配置文件
+
+1. 创建一个“数据源配置类”`com.maqf.config.DataSourceConfiguration.java`
+
+```java
+package com.maqf.config;
+
+import com.alibaba.druid.pool.DruidDataSource;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.PropertySource;
+
+import javax.sql.DataSource;
+
+/**
+ * @ClassName DataSourceConfiguration
+ * @Description: TODO
+ * @Author: maqf22@qq.com
+ */
+@PropertySource("classpath:jdbc.properties")
+public class DataSourceConfiguration {
+    @Value("${MYSQL_DRIVER}")
+    private String driver;
+    @Value("${MYSQL_URL}")
+    private String url;
+    @Value("${MYSQL_USER}")
+    private String user;
+    @Value("${MYSQL_PASSWORD}")
+    private String password;
+
+    @Bean("dataSource")
+    public DataSource getDataSource() {
+        DruidDataSource dataSource = new DruidDataSource();
+        dataSource.setDriverClassName(this.driver);
+        dataSource.setUrl(this.url);
+        dataSource.setUsername(this.user);
+        dataSource.setPassword(this.password);
+        return dataSource;
+    }
+}
+```
+
+2. 创建一个“核心配置类“`com.maqf.config.SpringConfiguration.java`
+
+```java
+package com.maqf.config;
+
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
+
+/**
+ * @ClassName SpringConfiguration
+ * @Description: TODO
+ * @Author: maqf22@qq.com
+ */
+@Configuration // 标注当前的类为核心配置文件类
+@ComponentScan("com.maqf") // 配置注解的扫描路径
+@Import({DataSourceConfiguration.class}) // 导入其他的配置文件
+public class SpringConfiguration {
+}
+```
+
+3. 测试
+
+```java
+@Test
+public void AnnoTest02() throws SQLException {
+	// 使用核心类之类的class对象创建容器对象
+	ApplicationContext app = new AnnotationConfigApplicationContext(SpringConfiguration.class);
+	DataSource dataSource = (DataSource) app.getBean("dataSource");
+	Connection conn = dataSource.getConnection();
+	System.out.println(conn);
+	conn.close();
+}
+```
+
+
+# 六、Spring整合Junit
+
+使用原始的Junit在测试过程中，都需要去创建容器对象和通过容器对象获取bean，如下
+
+```java
+ClassPathXmlApplicationContext app = new ClassPathXmlApplicationContext("ApplicationContext.xml");  
+MyDruidDataSource bean = app.getBean(MyDruidDataSource.class);
+```
+
+- 可以通过SpringJunit负责创建Spring容器
+- 将需要进行测试的bean直接在测试类中进行注入
+
+1. `pom.xml`中添加SpringJunit坐标
+
+```xml
+<!-- https://mvnrepository.com/artifact/org.springframework/spring-test -->
+<dependency>
+	<groupId>org.springframework</groupId>
+	<artifactId>spring-test</artifactId>
+	<version>5.3.20</version>
+	<scope>test</scope>
+</dependency>
+```
+
+2. 创建`com.mqf.test.JunitTest.java`并编辑源码
+
+```java
+package com.maqf.runTest;
+
+import com.maqf.config.SpringConfiguration;
+import com.maqf.dao.StuDao;
+import com.maqf.service.StuService;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+
+import javax.annotation.Resource;
+import javax.sql.DataSource;
+import java.sql.SQLException;
+
+/**
+ * @ClassName JunitTest
+ * @Description: TODO
+ * @Author: maqf22@qq.com
+ */
+// 使用@RunWith注解替换原来的运行
+@RunWith(SpringJUnit4ClassRunner.class)
+// 使用@ContextConfiguration指定配置文件或配置类
+// @ContextConfiguration("classpath:ApplicationContext.xml")
+@ContextConfiguration(classes = SpringConfiguration.class)
+public class JunitTest {
+    @Resource(name = "stuService")
+    private StuService stuService;
+    @Resource(name = "stuDao")
+    private StuDao stuDao;
+    @Resource(name = "dataSource")
+    private DataSource dataSource;
+
+    @Test
+    public void Test01() throws SQLException {
+        System.out.println(dataSource.getConnection());
+        stuDao.show();
+        stuService.show();
+    }
+}
+```
+
+
