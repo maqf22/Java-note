@@ -348,6 +348,312 @@ public String test11() {
 </script>
 ```
 
+- 返回引用数据类型
+
+1. 代码中直接返回要返回的对象
+
+```java
+@RequestMapping("/test12")
+@ResponseBody
+public User test12() {
+	return new User("root", "123");
+}
+```
+
+2. 在SpringMVC.xml中添加支持
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:mvc="http://www.springframework.org/schema/mvc"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="
+       http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/context
+       http://www.springframework.org/schema/context/spring-context.xsd
+       http://www.springframework.org/schema/mvc
+       http://www.springframework.org/schema/mvc/spring-mvc.xsd">
+
+    <!-- 包扫描 -->
+    <context:component-scan base-package="com.maqf.controller"/>
+
+    <!-- 加载SpringMVC中三大组件，包括：处理映射器，处理适配器，视图解析器 -->
+    <!-- 其中默认底层也继承了Jackson相关转换功能 -->
+    <mvc:annotation-driven/>
+
+</beans>
+```
+
+3. pom.xml中添加Jackson的依赖关系
+
+```xml
+<!-- https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-databind -->
+<dependency>
+	<groupId>com.fasterxml.jackson.core</groupId>
+	<artifactId>jackson-databind</artifactId>
+	<version>2.14.1</version>
+</dependency>
+<!-- https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-core -->
+<dependency>
+	<groupId>com.fasterxml.jackson.core</groupId>
+	<artifactId>jackson-core</artifactId>
+	<version>2.14.1</version>
+</dependency>
+<!-- https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-annotations -->
+<dependency>
+	<groupId>com.fasterxml.jackson.core</groupId>
+	<artifactId>jackson-annotations</artifactId>
+	<version>2.14.1</version>
+</dependency>
+```
+
+- 手动处理json串的另一种获取方式
+
+```java
+@RequestMapping("/test13")
+@ResponseBody
+public String test13() throws JsonProcessingException {
+	ObjectMapper om = new ObjectMapper();
+	User root = new User("root", "123");
+	String s = om.writeValueAsString(root);
+	return s;
+}
+```
+
+
+# 五、SpringMVC获取请求参数
+
+## 1. 基本类型参数
+
+```java
+@RequestMapping("/test14")
+@ResponseBody
+public void test14(HttpServletRequest request) {
+	String username = request.getParameter("username");
+	String password = request.getParameter("password");
+	System.out.println(username + ": " + password);
+}
+
+@RequestMapping("/test15")
+@ResponseBody
+public void test15(String username, String password) {
+	System.out.println(username + ": " + password);
+}
+```
+
+
+## 2. POJO类型参数
+
+> （Plain Ordinary java Object）实际就是普通JavaBean
+
+确保User类中存在setter/getter
+
+```java
+@RequestMapping("/test16")
+@ResponseBody
+public void test16(User user) {
+	String username = user.getUsername();
+	String password = user.getPassword();
+	System.out.println(username + ": " + password);
+}
+```
+
+
+## 3. 数组类型
+
+```jsp
+<form action="/web/test17" method="get">
+    <input type="checkbox" name="hobby" value="0">
+    <input type="checkbox" name="hobby" value="1">
+    <input type="checkbox" name="hobby" value="2">
+    <button>submit</button>
+</form>
+```
+
+```java
+@RequestMapping("/test17")
+@ResponseBody
+public void test17(String[] hobby) {
+	for (String index : hobby) {
+		System.out.println(index);
+	}
+}
+```
+
+
+## 4. 集合类型参数
+
+### a. 通过表单发送请求
+
+```java
+package com.maqf.global;
+
+import java.util.List;
+
+/**
+ * @ClassName MyValueObject
+ * @Description: TODO
+ * @Author: maqf22@qq.com
+ */
+public class MyValueObject {
+    private List<User> userList;
+
+    public List<User> getUserList() {
+        return userList;
+    }
+
+    public void setUserList(List<User> userList) {
+        this.userList = userList;
+    }
+
+    @Override
+    public String toString() {
+        return "MyValueObject{" +
+                "userList=" + userList +
+                '}';
+    }
+}
+```
+
+```jsp
+<form action="/web/test18" method="get">
+    <input type="hidden" name="userList[0].username" value="Jack">
+    <input type="hidden" name="userList[0].password" value="123">
+    <input type="hidden" name="userList[1].username" value="Rose">
+    <input type="hidden" name="userList[1].password" value="456">
+    <button>submit</button>
+</form>
+```
+
+```java
+@RequestMapping("/test18")
+@ResponseBody
+public void test18(MyValueObject mvo) {
+	System.out.println(mvo);
+}
+```
+
+### b. 通过Ajax请求
+
+```jsp
+<script>  
+    function method() {  
+        let arr = [  
+            {  
+                username: "Lily",  
+                password: "123"  
+            },  
+            {  
+                username: "Roll",  
+                password: "456"  
+            }  
+        ];  
+        let arrJson = JSON.stringify(arr);  
+        let xmlHttpRequest = new XMLHttpRequest();  
+        xmlHttpRequest.onreadystatechange = () => {  
+            if (xmlHttpRequest.readyState === 4 && xmlHttpRequest.status === 200) {  
+                console.log("request success!")  
+            }  
+        }  
+        xmlHttpRequest.open("POST", "/web/test19");  
+        xmlHttpRequest.setRequestHeader("Content-Type", "application/json");  
+        xmlHttpRequest.send(arrJson);  
+    }  
+</script>
+```
+
+```java
+@RequestMapping(value = "/test19", method = RequestMethod.POST)
+@ResponseBody
+public void test19(@RequestBody List<User> list) {
+	System.out.println(list);
+}
+```
+
+### c. @RequestParam
+
+> 参数绑定：用于解决前后端参数名不一致问题 
+
+```jsp
+<a href="/web/test20?uname=root&passwd=123">test20</a>
+```
+
+```java
+@RequestMapping("/test20")
+@ResponseBody
+public void test20(@RequestParam(value = "uname", required = false, defaultValue = "admin") String username, @RequestParam("passwd") String password) {
+	System.out.println(username + ": " + password);
+}
+```
+
+- 注解参数
+	- value：请求参数名称
+	- required：必须包含，默认值为true
+	- defaultValue：设置参数的默认值
+
+### d. @PathVariable
+
+> 获取Restful风格的参数，集合@RequestMapping实现
+> 通过”URL + 请求方式”来表示请求的目的，结合：POST(C) / GET(R) / PUT(U) / DELETE(D)
+
+```jsp
+<a href="/web/test21/admin">test21</a>
+```
+
+```java
+@RequestMapping(value = "/test21/{username}")
+@ResponseBody
+public void test21(@PathVariable("username") String username) {
+	System.out.println("username: " + username);
+}
+```
+
+### e. @RequestHeader
+
+> 用于获取请求数据，相当于`request.getHeader(name)`
+
+- 属性
+	- value：请求头的名字
+	- required：是否必须携带此参数
+
+```jsp
+<a href="/web/test22/">test22</a>
+```
+
+```java
+@RequestMapping("/test22")
+@ResponseBody
+public void test22(@RequestHeader("host") String host) {
+	System.out.println(host);
+}
+```
+
+### f. @CookieValue
+
+> 用于获取请求头中的Cookie
+
+- 属性
+	- value：cookie名字
+	- required：是否必须携带此cookie
+
+```java
+@RequestMapping("/test23")
+@ResponseBody
+public void test23(@CookieValue("JSESSIONID") String JSESSIONID) {
+	System.out.println(JSESSIONID);
+}
+```
+
+
+# 六、自定义类型转换器
+
+- SpringMVC为我们提供了一下常用的类型转换器，可以满足我们非特殊情况下的类型转换
+- 在特殊情况下，默认的类型转换器不能满足我们需求的时候，可以使用自定义类型转换器来解决问题 
+
+
+
 
 
 
