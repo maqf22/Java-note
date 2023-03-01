@@ -652,8 +652,446 @@ public void test23(@CookieValue("JSESSIONID") String JSESSIONID) {
 - SpringMVC为我们提供了一下常用的类型转换器，可以满足我们非特殊情况下的类型转换
 - 在特殊情况下，默认的类型转换器不能满足我们需求的时候，可以使用自定义类型转换器来解决问题 
 
+1. 定义转换器类实现Converter接口
+
+```java
+package com.maqf;
+
+import org.springframework.core.convert.converter.Converter;
+
+import java.text.ParseException;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+/**
+ * @ClassName DateConverter
+ * @Description: TODO
+ * @Author: maqf22@qq.com
+ */
+public class DateConverter implements Converter<String, Date> {
+
+    @Override
+    public Date convert(String s) {
+        Date date = null;
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-mm-dd");
+        try {
+            date = simpleDateFormat.parse(s);
+        } catch (ParseException e) {
+            throw new RuntimeException(e);
+        }
+        return date;
+    }
+}
+```
+
+2. 在配置文件中声明转换器
+
+```xml
 
 
+    <!-- 声明自定义类型转换器 -->
+    <bean id="dateConverter" class="org.springframework.context.support.ConversionServiceFactoryBean">
+        <property name="converters">
+            <list>
+                <bean class="com.maqf.DateConverter"></bean>
+            </list>
+        </property>
+    </bean>
+```
+
+3. 在`<annotation-driven>`中引用转换器
+
+```xml
+<mvc:annotation-driven conversion-service="dateConverter"/>
+```
 
 
+# 七、文件上传
+
+## 1. 客户端三要素
+
+1. 表单属性`<input type="file"/>`
+2. 表单提交方式`method="post"`
+3. 表单的额外提交属性`enctype="multipart/form-data"`
+
+> 当表单提交方式为多部分表单模式时，request对象中的各种getXXX()方法将失效
+
+
+## 2. 单文件上传
+
+1. `pom.xml`中导入`fileupload`和`io`相关坐标
+
+```xml
+<dependency>
+	<groupId>commons-fileupload</groupId>
+	<artifactId>commons-fileupload</artifactId>
+	<version>1.3.1</version>
+</dependency>
+
+<dependency>
+	<groupId>commons-io</groupId>
+	<artifactId>commons-io</artifactId>
+	<version>2.4</version>
+</dependency>
+```
+
+2. `SpringWebMVC.xml`中配置文件上传解析器
+
+```xml
+<!-- 配置文件上传解析器 -->
+<bean id="multipartResolver" class="org.springframework.web.multipart.commons.CommonsMultipartResolver">
+	<property name="defaultEncoding" value="UTF-8"/>
+	<property name="maxUploadSize" value="10240000"/>
+</bean>
+```
+
+3. 编写文件上传前后端代码
+
+```jsp
+<form action="/web/test26" method="post" enctype="multipart/form-data">
+    <input type="text" name="username" placeholder="请输入用户名"/>
+    <input type="file" name="uploadFile"/>
+    <input type="submit" value="upload"/>
+</form>
+```
+
+```java
+@RequestMapping(value = "/test26", method = RequestMethod.POST)
+@ResponseBody
+public void test26(String username, MultipartFile uploadFile) throws IOException {
+	// 获取文件对象名字
+	String fileName = username + "-" + uploadFile.getOriginalFilename();
+	// 将文件转移到指定的File对象中
+	uploadFile.transferTo(new File("D:\\uploadFileTest\\" + fileName));
+}
+```
+
+
+## 3. 多文件上传
+
+### a. 场景1
+
+```jsp
+<form action="/web/test27" method="post" enctype="multipart/form-data">
+    <input type="text" name="username" placeholder="请输入用户名"/>
+    <input type="file" name="uploadFile01"/>
+    <input type="file" name="uploadFile02"/>
+    <input type="submit" value="upload"/>
+</form>
+```
+
+```java
+@RequestMapping(value = "/test27", method = RequestMethod.POST)
+@ResponseBody
+public void test27(String username, MultipartFile uploadFile01, MultipartFile uploadFile02) throws IOException {
+	// 获取文件对象名字
+	String fileName01 = username + "-" + uploadFile01.getOriginalFilename();
+	String fileName02 = username + "-" + uploadFile02.getOriginalFilename();
+	// 将文件转移到指定的File对象中
+	uploadFile01.transferTo(new File("D:\\uploadFileTest\\" + fileName01));
+	uploadFile02.transferTo(new File("D:\\uploadFileTest\\" + fileName02));
+}
+```
+
+### b. 场景2
+
+```jsp
+<form action="/web/test28" method="post" enctype="multipart/form-data">
+    <input type="text" name="username" placeholder="请输入用户名"/>
+    <input type="file" name="uploadFiles" multiple/>
+    <input type="submit" value="upload"/>
+</form>
+```
+
+```java
+@RequestMapping(value = "/test28", method = RequestMethod.POST)
+@ResponseBody
+public void test28(String username, MultipartFile[] uploadFiles) throws IOException {
+	for (MultipartFile uploadFile : uploadFiles) {
+		String fileName = username + "-" + uploadFile.getOriginalFilename();
+		System.out.println(fileName);
+		uploadFile.transferTo(new File("D:\\uploadFileTest\\" + fileName));
+	}
+}
+```
+
+> 解决全局请求参数中文乱码问题，配置web.xml
+
+```xml
+<filter>
+	<filter-name>CharacterEncodingFilter</filter-name>
+	<filter-class>org.springframework.web.filter.CharacterEncodingFilter</filter-class>
+	<init-param>
+		<param-name>encoding</param-name>
+		<param-value>UTF-8</param-value>
+	</init-param>
+</filter>
+<filter-mapping>
+	<filter-name>CharacterEncodingFilter</filter-name>
+	<url-pattern>/*</url-pattern>
+</filter-mapping>
+```
+
+
+# 八、Spring JdbcTemplate
+
+## 1. 快速上手
+
+1. `pom.xml`中导入`spring-jdbc`与`spring-tx`坐标
+
+```xml
+<dependency>
+	<groupId>springframework</groupId>
+	<artifactId>spring-jdbc</artifactId>
+	<version>1.2.6</version>
+</dependency>
+
+<dependency>
+	<groupId>org.springframework</groupId>
+	<artifactId>spring-tx</artifactId>
+	<version>5.3.20</version>
+</dependency>
+```
+
+2. 创建数据库与实体对应的类
+
+> 创建User数据表，User类，保证结构一致
+
+3. 创建JdbcTemplate对象
+
+4. 执行CRUD相关数据库操作
+
+```java
+package com.example.test;
+
+import com.mchange.v2.c3p0.ComboPooledDataSource;
+import org.junit.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
+
+import java.beans.PropertyVetoException;
+
+/**
+ * @ClassName JdbcTemplateTest
+ * @Description: TODO
+ * @Author: maqf22@qq.com
+ */
+public class JdbcTemplateTest {
+    private static final String DRIVER = "com.jdbc.mysql.Driver";
+    private static final String URL = "jdbc:mysql://127.0.0.1:3306/spring_data";
+    private static final String USER = "root";
+    private static final String PASSWORD = "root";
+
+    @Test
+    public void test01() throws PropertyVetoException {
+        // 定义一个数据源
+        ComboPooledDataSource dataSource = new ComboPooledDataSource();
+        dataSource.setDriverClass(DRIVER);
+        dataSource.setJdbcUrl(URL);
+        dataSource.setUser(USER);
+        dataSource.setPassword(PASSWORD);
+        // 定义JdbcTemplate对象
+        JdbcTemplate jdbcTemplate = new JdbcTemplate();
+        jdbcTemplate.setDataSource(dataSource);
+        // 插入一条数据
+        String sql = "insert into `user` (`username`, `password`) value (?, ?)";
+        int row = jdbcTemplate.update(sql, new String[]{"Jack", "123"});
+        System.out.println(row + "行受影响！");
+    }
+}
+```
+
+
+## 2. 通过IOC实现
+
+1. ApplicationContext.xml中添加容器对象
+``
+```properties
+JDBC_DRIVER=com.jdbc.mysql.Driver
+JDBC_URL=jdbc:mysql://127.0.0.1:3306/spring_data
+JDBC_USER=root
+JDBC_PASSWORD=root
+```
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="
+       http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/context
+       http://www.springframework.org/schema/context/spring-context.xsd
+">
+
+    <context:property-placeholder location="classpath:jdbc.properties"/>
+
+    <bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+        <property name="driverClass" value="${JDBC_DRIVER}"/>
+        <property name="jdbcUrl" value="${JDBC_URL}"/>
+        <property name="user" value="${JDBC_USER}"/>
+        <property name="password" value="${JDBC_PASSWORD}"/>
+    </bean>
+
+    <bean name="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
+        <property name="dataSource" ref="dataSource"/>
+    </bean>
+
+</beans>
+```
+
+2. 编写测试代码
+
+```java
+@Test
+public void test02() {
+	ClassPathXmlApplicationContext app = new ClassPathXmlApplicationContext("ApplicationContext.xml");
+	JdbcTemplate jt = app.getBean(JdbcTemplate.class);
+	int row = jt.update("insert into `user` (`username`, `password`) value (?, ?)", new String[]{"Rose", "456"});
+	System.out.println(row + "行受影响！");
+}
+```
+
+
+## 3. 整合Junit测试CRUD
+
+1. 导入Spring-test与Junit
+
+> 注意坐标版本！版本不兼容会导致错误。
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>SpringDemo-04-JdbcTemplate</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <name>SpringDemo-04-JdbcTemplate</name>
+    <packaging>war</packaging>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <maven.compiler.source>1.8</maven.compiler.source>
+    </properties>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <version>4.0.1</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+            <version>5.1.5.RELEASE</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+            <version>5.1.5.RELEASE</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webmvc</artifactId>
+            <version>5.1.5.RELEASE</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-core</artifactId>
+            <version>5.1.5.RELEASE</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-test</artifactId>
+            <version>5.1.5.RELEASE</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-tx</artifactId>
+            <version>5.1.5.RELEASE</version>
+        </dependency>
+
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>5.1.47</version>
+        </dependency>
+
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.12</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.mchange</groupId>
+            <artifactId>c3p0</artifactId>
+            <version>0.9.5.2</version>
+        </dependency>
+
+        <dependency>
+            <groupId>springframework</groupId>
+            <artifactId>spring-jdbc</artifactId>
+            <version>1.2.6</version>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>3.3.2</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+```
+
+2. 新建MyJdbcTemplateCRUDTest.java测试CRUD
+
+```java
+package com.example.test;
+
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+
+/**
+ * @ClassName MyJdbcTemplateCRUDTest
+ * @Description: TODO
+ * @Author: maqf22@qq.com
+ */
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration("classpath:ApplicationContext.xml")
+public class MyJdbcTemplateCRUDTest {
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Test
+    public void updateTest() {
+        int row = jdbcTemplate.update("update `user` set `username`=? where `username`=?", new String[]{"Rose", "Lily"});
+        System.out.println(row + "行受影响！");
+    }
+}
+```
 
