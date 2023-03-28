@@ -1046,7 +1046,7 @@ public void test02() {
         <dependency>
             <groupId>springframework</groupId>
             <artifactId>spring-jdbc</artifactId>
-            <version>1.2.6</version>
+            <version>5.1.5.RELEASE</version>
         </dependency>
 
     </dependencies>
@@ -1066,32 +1066,86 @@ public void test02() {
 2. 新建MyJdbcTemplateCRUDTest.java测试CRUD
 
 ```java
-package com.example.test;
-
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-
-/**
- * @ClassName MyJdbcTemplateCRUDTest
- * @Description: TODO
- * @Author: maqf22@qq.com
- */
-@RunWith(SpringJUnit4ClassRunner.class)
-@ContextConfiguration("classpath:ApplicationContext.xml")
-public class MyJdbcTemplateCRUDTest {
-
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
-
-    @Test
-    public void updateTest() {
-        int row = jdbcTemplate.update("update `user` set `username`=? where `username`=?", new String[]{"Rose", "Lily"});
-        System.out.println(row + "行受影响！");
-    }
+package com.example.test;  
+  
+import com.example.global.User;  
+import org.junit.Test;  
+import org.junit.runner.RunWith;  
+import org.springframework.beans.factory.annotation.Autowired;  
+import org.springframework.jdbc.core.BeanPropertyRowMapper;  
+import org.springframework.jdbc.core.JdbcTemplate;  
+import org.springframework.test.context.ContextConfiguration;  
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;  
+  
+import java.util.List;  
+import java.util.Map;  
+  
+@RunWith(SpringJUnit4ClassRunner.class)  
+@ContextConfiguration("classpath:ApplicationContext.xml")  
+public class MyJdbcTemplateCRUDTest {  
+  
+    @Autowired  
+    private JdbcTemplate jdbcTemplate;  
+  
+    @Test  
+    public void updateTest() {  
+        int row = jdbcTemplate.update("update `user` set `username`=? where `username`=?", "Rose", "Lily");  
+        System.out.println(row + "行受影响！");  
+    }  
+  
+    @Test  
+    public void deleteTest() {  
+        int row = jdbcTemplate.update("delete from `user` where username=?", "test");  
+        System.out.printf("%d行受影响", row);  
+    }  
+  
+    @Test  
+    public void insertTest() {  
+        int row = jdbcTemplate.update("insert into `user` (`username`, `password`) value (?, ?)", "Kitty", "888");  
+        System.out.printf("%d行受影响", row);  
+    }  
+  
+    @Test  
+    public void selectTest() {  
+        List<User> query = jdbcTemplate.query("select * from `user`", new BeanPropertyRowMapper<>(User.class));  
+        System.out.println(query);  
+    }  
+  
+    @Test  
+    public void selectByIDTest() {  
+        Map<String, Object> user = jdbcTemplate.queryForMap("select * from `user` where `id`=?", 1);  
+        System.out.println(user);  
+        System.out.println(user.get("username"));  
+    }  
+  
+    @Test  
+    public void selectByUsernameTest() {  
+        User user = jdbcTemplate.queryForObject("select * from `user` where `username`=?", new BeanPropertyRowMapper<>(User.class), "Rose");  
+        if (null == user) return;  
+        System.out.println(user);  
+        System.out.println(user.getUsername());  
+    }  
+  
+    @Test  
+    public void selectCountTest() {  
+        Integer total = jdbcTemplate.queryForObject("select count(*) from `user`", Integer.class);  
+        System.out.printf("一共有%d用户", total);  
+    }  
 }
 ```
+
+
+# 九、SpringMVC拦截器
+
+> SpringMVC中的拦截器（interceptor）类似于Servlet中的Filter，用于对处理器进行预处理或后处理
+> 可以将拦截器按一定的顺序连接成一条链，这条链称之为**拦截器链（Interceptor Chain）**，在访问被拦截的方法或者字段的时候，拦截器链中的拦截器会按之前的定义顺序被调用，拦截器也是AOP（面向切面编程）思想的具体体现
+
+## 1. Filter 与 Interceptor
+
+区别 | 过滤器（Filter）| 拦截器（Interceptor）
+:- | :- | :-
+使用范围 | 是Servlet规范中的一部分，任何的JavaWeb工程都可以使用 | 是SpringMVC框架自己的，只有使用了SpringMVC框架的工程才能使用
+拦截范围 | 在url-parttern中配置了/\*之后，可以对索要访问的资源进行拦截 | 如果访问的是jsp、html、css、image或者是js文件则不会进行拦截
+
+
 
