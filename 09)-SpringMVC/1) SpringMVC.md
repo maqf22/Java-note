@@ -1147,5 +1147,101 @@ public class MyJdbcTemplateCRUDTest {
 使用范围 | 是Servlet规范中的一部分，任何的JavaWeb工程都可以使用 | 是SpringMVC框架自己的，只有使用了SpringMVC框架的工程才能使用
 拦截范围 | 在url-parttern中配置了/\*之后，可以对索要访问的资源进行拦截 | 如果访问的是jsp、html、css、image或者是js文件则不会进行拦截
 
+## 2. 快速上手
 
+1. 创建 一个项目环境
+
+![[Pasted image 20230329173254.png]]
+
+2. 创建Controller
+
+```java
+package com.maqf.controller;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.servlet.ModelAndView;
+
+@Controller
+public class TestController {
+    @RequestMapping("/runTest")
+    public ModelAndView runTest(ModelAndView modelAndView, String username) {
+        System.out.println("runTest() is running...");
+        modelAndView.addObject("username", username);
+        modelAndView.setViewName("success.jsp");
+        return modelAndView;
+    }
+}
+```
+
+4. 创建拦截器
+
+```java
+package com.maqf.interceptor;
+
+import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.servlet.ModelAndView;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+public class MyInterceptor01 implements HandlerInterceptor {
+    @Override
+    // 执行目标之前被执行
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        System.out.println("preHandle() is running...");
+        if (request.getParameter("username").equals("root")) {
+            return true; // 放行
+        } else {
+            request.getRequestDispatcher("/fail.jsp").forward(request, response);
+            return false; // 不放行
+        }
+    }
+
+    @Override
+    // 执行目标之后，在返回视图之前
+    public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler, ModelAndView modelAndView) throws Exception {
+        // HandlerInterceptor.super.postHandle(request, response, handler, modelAndView);
+        System.out.println("postHandle() is running...");
+    }
+
+    @Override
+    // 最后执行
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
+        // HandlerInterceptor.super.afterCompletion(request, response, handler, ex);
+        System.out.println("afterCompletion() is running...");
+    }
+}
+```
+
+4. 配置拦截器
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:mvc="http://www.springframework.org/schema/mvc"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="
+       http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/context
+       http://www.springframework.org/schema/context/spring-context.xsd
+       http://www.springframework.org/schema/mvc
+       http://www.springframework.org/schema/mvc/spring-mvc.xsd
+">
+    <context:component-scan base-package="com.maqf.controller"/>
+    <mvc:annotation-driven/>
+
+    <!-- 配置拦截器 -->
+    <mvc:interceptors>
+        <mvc:interceptor>
+            <mvc:mapping path="/**"/>
+            <bean class="com.maqf.interceptor.MyInterceptor01"/>
+        </mvc:interceptor>
+    </mvc:interceptors>
+
+    <mvc:default-servlet-handler/>
+</beans>
+```
 
