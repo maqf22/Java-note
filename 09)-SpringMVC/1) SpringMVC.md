@@ -1245,3 +1245,118 @@ public class MyInterceptor01 implements HandlerInterceptor {
 </beans>
 ```
 
+
+# 十、SpringMVC异常处理
+
+## 1. 异常处理方式
+
+1. 使用SpringMVC提供的简单异常处理器SimpleMappingExceptionResolver
+2. 实现Spring的异常处理接口HandlerExceptionResolver自定义自己的异常处理器
+
+## 2. 方案一
+
+> SimpleMappingExceptionResolver
+> 在SpringMVC配置文件中添加
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:mvc="http://www.springframework.org/schema/mvc"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="
+       http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/context
+       http://www.springframework.org/schema/context/spring-context.xsd
+       http://www.springframework.org/schema/mvc
+       http://www.springframework.org/schema/mvc/spring-mvc.xsd
+">
+    <context:component-scan base-package="com.example.controller"/>
+    <mvc:annotation-driven/>
+
+    <bean class="org.springframework.web.servlet.handler.SimpleMappingExceptionResolver">
+        <!-- 配置默认的异常跳转视图页面 -->
+        <property name="defaultErrorView" value="defaultException.jsp"></property>
+        <property name="exceptionMappings">
+            <map>
+                <entry key="java.lang.ArithmeticException" value="ArithmeticException.jsp"/>
+                <entry key="java.lang.NullPointerException" value="NullPointerException.jsp"/>
+                <entry key="com.example.exception.MyException" value="MyException.jsp"/>
+            </map>
+        </property>
+    </bean>
+</beans>
+```
+
+## 3. 方案二
+
+> HandlerExceptionResolver
+
+1. 创建自定义异常处理的实现类，实现 `HandlerExceptionResolver`
+
+```java
+package com.example.resolver;
+
+import com.example.exception.MyException;
+import org.springframework.web.servlet.HandlerExceptionResolver;
+import org.springframework.web.servlet.ModelAndView;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+public class ExceptionResolver implements HandlerExceptionResolver {
+    @Override
+    public ModelAndView resolveException(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
+        ModelAndView modelAndView = new ModelAndView();
+        modelAndView.setViewName("ExceptionResolver.jsp");
+        if (ex instanceof NullPointerException) {
+            modelAndView.addObject("info", "NullPointerException");
+        } else if (ex instanceof ArithmeticException) {
+            modelAndView.addObject("info", "ArithmeticException");
+        } else if (ex instanceof MyException) {
+            modelAndView.addObject("info", "MyException");
+        }
+        return modelAndView;
+    }
+}
+```
+
+2. 配置异常处理器，添加内容到SpringMVC配置文件
+
+```xml
+<bean class="com.example.resolver.ExceptionResolver"/>
+```
+
+3. 编写异常页面
+
+```jsp
+<%--
+  Created by IntelliJ IDEA.
+  User: Administrator
+  Date: 2023/4/27
+  Time: 18:02
+  To change this template use File | Settings | File Templates.
+--%>
+<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<html>
+<head>
+    <title>Exception Resolver</title>
+</head>
+<body>
+  <h1>exception: ${info}</h1>
+</body>
+</html>
+```
+
+
+# 十一、Spring-AOP
+
+## 1. 简介
+
+> AOP(Aspect Oriented Programming)-面向切面编程
+> 是通过预编译方式和运行期间动态代理实现程序统一维护的技术
+
+- 作用：在程序运行期间，在不修改源码的情况下对方法进行功能上的补充增强
+- 优势：减少重复的代码，提高开发效率，便于维护
+
