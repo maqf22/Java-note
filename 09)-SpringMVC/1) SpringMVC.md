@@ -1360,3 +1360,454 @@ public class ExceptionResolver implements HandlerExceptionResolver {
 - 作用：在程序运行期间，在不修改源码的情况下对方法进行功能上的补充增强
 - 优势：减少重复的代码，提高开发效率，便于维护
 
+## 2. AOP相关概念
+
+- Target（目标对象）：目标对象
+- Proxy（代理）：代理对象
+- Joinpoint（连接点）：就是被拦截到的方法（可以被增强的方法）
+- Pointcut（切入点）：用来指定被设置的连接点
+- Advice（通知/增强）：拦截到连接点之后要做的动作
+- Aspect（切面）：切入点 + 通知
+- Weaving（织入）：切入点与通知结合的过程
+
+## 3. AOP开发注意事项
+
+1. 需要编写的内容
+	- 编写核心业务代码（目标类的目标方法）
+	- 编写切面类，切面类中有通知（增强功能方法）
+	- 在配置文件中，配置织入关系，就是将通知与连接点相结合
+2. AOP技术实现
+	- 做好相关的配置之后，让Spring快乐的帮我们做事情
+3. AOP底层使用的代理方式
+	- JDK代理：如果目标类没有使用接口
+	- cjlib代理：如果目标类使用了接口
+
+## 4. 快速上手
+
+### a. XML方式实现
+
+1. 导入pom.xml
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>SpringDemo-08-AOP</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <name>SpringDemo-08-AOP</name>
+    <packaging>war</packaging>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <junit.version>5.9.1</junit.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <version>4.0.1</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+            <version>5.3.26</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-test</artifactId>
+            <version>5.3.26</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/org.aspectj/aspectjweaver -->
+        <dependency>
+            <groupId>org.aspectj</groupId>
+            <artifactId>aspectjweaver</artifactId>
+            <version>1.9.6</version>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.13.2</version>
+        </dependency>
+    </dependencies>
+</project>
+```
+
+2. 创建Target类
+
+```java
+package com.example.aop;
+
+public class Target implements TargetInterface {
+    @Override
+    public void test() {
+        System.out.println("test() is running~");
+    }
+}
+```
+
+3. 创建MyAspect类
+
+```java
+package com.example.aspect;
+
+public class MyAspect {
+    public void before() {
+        System.out.println("before() is running~");
+    }
+    public void after() {
+        System.out.println("after() is running~");
+    }
+}
+```
+
+4. 配置ApplicationContext.xml
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="
+        http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/aop
+        http://www.springframework.org/schema/aop/spring-aop.xsd
+">
+
+    <bean id="target" class="com.example.aop.Target"/>
+    <bean id="myAspect" class="com.example.aspect.MyAspect"/>
+
+    <!-- 配置织入过程 -->
+    <aop:config>
+        <aop:aspect ref="myAspect">
+            <aop:before method="before" pointcut="execution(public void com.example.aop.Target.test())"/>
+            <aop:after method="after" pointcut="execution(public void com.example.aop.Target.test())"/>
+        </aop:aspect>
+    </aop:config>
+
+</beans>
+```
+
+5. 创建测试类
+
+```java
+package com.example.test;
+
+import com.example.aop.TargetInterface;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration("classpath:ApplicationContext.xml")
+public class AopRunTest {
+    @Autowired
+    private TargetInterface target;
+
+    @Test
+    public void test() {
+        target.test();
+    }
+}
+```
+
+
+---
+
+#### 切点表达式
+
+`execution[修饰符] 返回值类型 包名.类名.方法名(参数类型)`
+- 权限修饰符可以省略
+- 返回值、包名、类名、方法名都可以使用\*表示任意
+- 包名与类名之间使用一个点儿，表示当前包下的类；两个点儿，表示当前包及子包下的类
+- 参数列表可以使用两个点儿，表示任意个数，任意类型的参数（用于方法的重载）
+
+```xml
+execution(public void com.example.aop.Target.method())
+<!-- 指定一个绝对方法的路径 -->
+execution(void com.example.aop.Target.*(..))
+<!-- void com.example.aop.Target.任意方法(任意参数) -->
+execution(* com.example.aop.*.*(..))
+<!-- 任意返回值 com.example.aop.任意类.任意方法(任意参数) -->
+execution(* com.example.aop..*.*(..))
+<!-- 任意返回值 com.example.aop..aop包及其子包的任意类，任意方法(任意参数) -->
+execution(* *..*.*(..))
+<!-- 各种任意 -->
+```
+
+#### 通知类型
+
+通知配置语法：`<aop:通知类型 method:"切面类中的方法名" pointcut="切点表达式"/>`
+
+名称 | 标签 | 说明
+:- | :- | :-
+前置通知 | `<aop:before>` | 指定目标方法执行之前
+后置通知 | `<aop:returning>` | 指定目标方法执行之后
+环绕通知 | `<aop:around>` | 指定目标方法执行之前、之后都执行；`ProceedingJoinPoint`作为形参
+异常抛出通知 | `<aop:after-throwing>` | 指定目标方法出现异常时
+最终通知 | `<aop:after>` | 各种情况都会执行
+
+```java
+package com.example.aspect;
+
+import org.aspectj.lang.ProceedingJoinPoint;
+
+public class MyAspect {
+    public void before() {
+        System.out.println("before() is running~");
+    }
+    public void after() {
+        System.out.println("after() is running~");
+    }
+    public Object around(ProceedingJoinPoint point) throws Throwable {
+        System.out.println("around before~");
+        Object resObj = point.proceed(); // 调用的是目标对象当中需要增强的目标方法
+        System.out.println("around after~");
+        return resObj;
+    }
+}
+```
+
+```xml
+<!-- 配置织入过程 -->
+<aop:config>
+	<aop:aspect ref="myAspect">
+		<aop:before method="before" pointcut="execution(public void com.example.aop.Target.test())"/>
+		<aop:after method="after" pointcut="execution(public void com.example.aop.Target.test())"/>
+		<aop:around method="around" pointcut="execution(* com.example.aop.Target.*(..))"/>
+	</aop:aspect>
+</aop:config>
+```
+
+#### 切点的抽取
+
+```xml
+<!-- 配置织入过程 -->
+<aop:config>
+	<!-- 切点的抽取 -->
+	<aop:pointcut id="myPointCut" expression="execution(* com.example.aop.Target.*(..))"/>
+	<!-- 声明切面 -->
+	<aop:aspect ref="myAspect">
+		<!-- 切面 = 切点 + 通知 -->
+		<aop:before method="before" pointcut="execution(public void com.example.aop.Target.test())"/>
+		<aop:after method="after" pointcut="execution(public void com.example.aop.Target.test())"/>
+		<aop:around method="around" pointcut-ref="myPointCut"/>
+	</aop:aspect>
+</aop:config>
+```
+
+
+### b. 注解方式实现
+
+1. 创建Target类，使用`@Component`暴露出去
+
+```java
+package com.example.anno;
+
+import org.springframework.stereotype.Component;
+
+@Component("target")
+public class Target implements TargetInterface {
+    @Override
+    public void test() {
+        System.out.println("anno test() is running~");
+    }
+}
+```
+
+2. 创建MyAspectAnno类，使用`@Component`暴露并使用`@Aspect`声明切面类
+
+```java
+package com.example.anno;
+
+import org.aspectj.lang.annotation.After;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+import org.springframework.stereotype.Component;
+
+@Component
+@Aspect
+public class MyAspectAnno {
+    @Before("execution(public void com.example.anno.Target.test())")
+    public void before() {
+        System.out.println("anno before() is running~");
+    }
+
+    @After(value = "execution(public void com.example.anno.*.*(..))")
+    public void after() {
+        System.out.println("anno after() is running~");
+    }
+}
+```
+
+3. 创建`ApplicationContextAnno.xml`
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="
+        http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/aop
+        http://www.springframework.org/schema/aop/spring-aop.xsd
+        http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context.xsd
+">
+    <!-- 扫描 -->
+    <context:component-scan base-package="com.example.anno"/>
+    <!-- 自动代理声明切面 -->
+    <aop:aspectj-autoproxy/>
+</beans>
+```
+
+> 注意：Target类 和 MyAspectAnno类都要在com.example.anno包中被扫描到
+
+4. 创建测试类
+
+```java
+package com.example.test;
+
+import com.example.anno.TargetInterface;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration("classpath:ApplicationContextAnno.xml")
+public class AnnoRunTest {
+    @Autowired
+    private TargetInterface target;
+
+    @Test
+    public void test() {
+        target.test();
+    }
+}
+```
+
+#### 注解通知类型
+
+语法：@通知注解("切点表达式")
+
+名称 | 标签 | 说明
+:- | :- | :-
+前置通知 | `@Before` | 提定目标方法执行之前
+后置通知 | `@AfterReturning` | 指定目标方法执行之后
+环绕通知 | `@Around` | 指定目标方法执行之前、之后都执行；`ProceedingJoinPoint`作为形参
+异常抛出通知 | `@AfterThrowing` | 指定目标方法出现异常时
+最终通知 | `@After` | 各种情况都会执行
+
+#### 切点表达式的抽取
+
+```java
+package com.example.anno;
+
+import org.aspectj.lang.annotation.After;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+import org.aspectj.lang.annotation.Pointcut;
+import org.springframework.stereotype.Component;
+
+@Component
+@Aspect
+public class MyAspectAnno {
+	// 抽取
+    @Pointcut("execution(public void com.example.anno.Target.test())")
+    public void pointcut() {}
+
+    // @Before("execution(public void com.example.anno.Target.test())")
+    // @Before("pointcut()")
+    @Before("MyAspectAnno.pointcut()")
+    public void before() {
+        System.out.println("anno before() is running~");
+    }
+
+    @After(value = "execution(public void com.example.anno.*.*(..))")
+    public void after() {
+        System.out.println("anno after() is running~");
+    }
+}
+```
+
+
+# 十二、Spring事务处理
+
+## 1. 编程式事务控制相关对象
+
+> 了解
+
+- `PlatformTransactionManager`接口-平台事务管理器（Sring的事务管理器）-维护事务的相关参数
+
+方法 | 说明
+:- | :-
+`TransactionStatus getTransaction(TransactionDefinition defination)` | 获取事务的状态信息
+`void commit(TransactionStatus status)` | 提交事务
+`void rollback(TransactionStatus status)` | 回滚事务
+
+- `TransactionDefinition`是事务的定义信息对象
+
+方法 | 说明
+:- | :-
+`int getIsolationLevel()` | 获取事务的隔离级别
+`int getPropogationBehavior()` | 获取事务的传播行为
+`int getTimeout()` | 获取超时时间
+`boolean isReadOnly()` | 是否只读，true只读，false读写
+
+> 隔离级别：用于解决多个并发问题，其中包括脏读、不可重复读和幻读
+
+级别 | 状态 | 说明
+:- | :- | :-
+READ UNCOMMITTED | 读未提交数据 | 允许事务读取未被其他事务提交的变更数据，<br/>会出现脏读，不可重复和幻读问题
+READ COMMITTED | 读已提交数据 | 只允许事务读取已经被其他事务提交的变更数据，<br/>可避免脏读，仍会出现不可重复读和幻读问题
+REPEATABLE READ (MySQL默认)  | 可重复读 | 确保事务可以多次从一个字段中读取相同的值，<br/>在此事务持续期间，禁止其他事务对此字段的更新，<br/>可以避免脏读和不可重复读，仍会出现幻读问题
+SERIALIZABLE | 序列化 | 锁表，确保事务可以从一个表中读取相同的行，<br/>在这个事务持续期间，禁止其他事务对该表执行插入，<br/>更新和删除操作，可避免所有并发问题，但性能非常低
+
+> 传播行为：用于解决业务层调用多个动作的时候，统一事务处理
+
+行为 | 说明
+:- | :-
+REQUIRED | 如果当前没有事务，就新建一个事务，如果已存在一个事务中，加入到这个事务中（默认值）
+SUPPORTS | 支持当前事务，如果当前没有事务，就以非事务方式执行（没有事务）
+MANDATORY | 使用当前事务，如果当前没有事务，就抛异常
+REQUERS_NEW | 新建事务，如果当前在事务中，就把当前事务挂起
+NOT_SUPPORTED | 以非事务方式执行操作，如果当前存在事务，就把当前事务持起
+NEVER | 以非事务方式运行，如果当前存在事务，则抛异常
+NESTED | 如果当前存在事务，在嵌套事务内执行，如果当前没有事务，则执行REQUIRED类似操作
+超时时间 | 默认值是-1，没有超时限制，如果有，以秒为单位设置
+是否只读 | 建议查询时设置为只读
+
+- `TransactionStatus`事务的运行状态
+
+方法 | 说明
+:- | :-
+`boolean hasSavepoint()` | 是否存储回滚点
+`boolean isCompleted()` | 事务是否完成
+`boolean isNewTransaction()` | 是否是新的事务
+`boolean isRollbackOnly()` | 事务是否回滚
+
+
+## 2. 声明式事务控制
+
+> 使用声明的方式来处理事务
+> 事务处理通常是系统层面的处理，与业务层分离。维护起来更加的方便
+> 实际上就是AOP思想的另外一种体现形式
+
+### a. 准备测试环境
+
+1. 
+
