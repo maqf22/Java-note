@@ -721,11 +721,956 @@ public class ExampleTypeHandler extends BaseTypeHandler<String> {
 > 例如，pageHelper：https://pagehelper.github.io/
 
 
-## 8. 多表操作
+# 8. 多表操作
 
-### 1) 1对1关系
+## 1) 1对1关系
+
+1. 数据库创建student和lession表并填充数据
+
+```sql
+create table `student` (
+	`stu_id` int unsigned not null auto_increment,
+	`stu_name` varchar(30) not null,
+	`stu_gender` enum('-1', '0', '1') default '-1',
+	`stu_age` int unsigned default '0',
+	`lession_id` int unsigned default '0',
+	 primary key(`stu_id`)
+);
+
+insert into `student` (`stu_name`, `stu_gender`, `stu_age`, `lession_id`) values
+('rose', '0', '17', '1'),
+('jack', '1', '18', '0'),
+('lily', '0', '16', '1');
+
+create table `lession` (
+	`lession_id` int unsigned primary key auto_increment,
+	`lession_name` varchar(60) not null,
+	`lession_techer` varchar(30) not null
+);
+
+insert into `lession` (`lession_name`, `lession_techer`) values
+('itjava', 'aa'),
+('itgolang', 'bb');
+
+-- select * from `student`, `lession` where `student`.`lession_id` = `lession`.`lession_id`;
+```
+
+3. 创建Student和Lession实体类
+
+```java
+package com.example.domain;
+
+public class Lession {
+    private Integer lession_id;
+    private String lession_name;
+    private String lession_teacher;
+
+    public Lession() {
+    }
+
+    public Lession(String lession_name, String lession_teacher) {
+        this.lession_name = lession_name;
+        this.lession_teacher = lession_teacher;
+    }
+
+    public Lession(Integer lession_id, String lession_name, String lession_teacher) {
+        this.lession_id = lession_id;
+        this.lession_name = lession_name;
+        this.lession_teacher = lession_teacher;
+    }
+
+    public Integer getLession_id() {
+        return lession_id;
+    }
+
+    public void setLession_id(Integer lession_id) {
+        this.lession_id = lession_id;
+    }
+
+    public String getLession_name() {
+        return lession_name;
+    }
+
+    public void setLession_name(String lession_name) {
+        this.lession_name = lession_name;
+    }
+
+    public String getLession_teacher() {
+        return lession_teacher;
+    }
+
+    public void setLession_teacher(String lession_teacher) {
+        this.lession_teacher = lession_teacher;
+    }
+
+    @Override
+    public String toString() {
+        return "Lession{" +
+                "lession_id=" + lession_id +
+                ", lession_name='" + lession_name + '\'' +
+                ", lession_teacher='" + lession_teacher + '\'' +
+                '}';
+    }
+}
+```
+
+```java
+package com.example.domain;
+
+public class Student {
+    private Integer stu_id;
+    private String stu_name;
+    private String stu_gender;
+    private Integer stu_age;
+    private Integer lession_id;
+    private Lession lession;
+
+    public Student() {
+    }
+
+    public Student(String stu_name, String stu_gender, Integer stu_age, Integer lession_id, Lession lession) {
+        this.stu_name = stu_name;
+        this.stu_gender = stu_gender;
+        this.stu_age = stu_age;
+        this.lession_id = lession_id;
+        this.lession = lession;
+    }
+
+    public Student(Integer stu_id, String stu_name, String stu_gender, Integer stu_age, Integer lession_id, Lession lession) {
+        this.stu_id = stu_id;
+        this.stu_name = stu_name;
+        this.stu_gender = stu_gender;
+        this.stu_age = stu_age;
+        this.lession_id = lession_id;
+        this.lession = lession;
+    }
+
+    public Integer getStu_id() {
+        return stu_id;
+    }
+
+    public void setStu_id(Integer stu_id) {
+        this.stu_id = stu_id;
+    }
+
+    public String getStu_name() {
+        return stu_name;
+    }
+
+    public void setStu_name(String stu_name) {
+        this.stu_name = stu_name;
+    }
+
+    public String getStu_gender() {
+        return stu_gender;
+    }
+
+    public void setStu_gender(String stu_gender) {
+        this.stu_gender = stu_gender;
+    }
+
+    public Integer getStu_age() {
+        return stu_age;
+    }
+
+    public void setStu_age(Integer stu_age) {
+        this.stu_age = stu_age;
+    }
+
+    public Integer getLession_id() {
+        return lession_id;
+    }
+
+    public void setLession_id(Integer lession_id) {
+        this.lession_id = lession_id;
+    }
+
+    public Lession getLession() {
+        return lession;
+    }
+
+    public void setLession(Lession lession) {
+        this.lession = lession;
+    }
+
+    @Override
+    public String toString() {
+        return "Student{" +
+                "stu_id=" + stu_id +
+                ", stu_name='" + stu_name + '\'' +
+                ", stu_gender='" + stu_gender + '\'' +
+                ", stu_age=" + stu_age +
+                ", lession_id=" + lession_id +
+                ", lession=" + lession +
+                '}';
+    }
+}
+```
+
+3. 创建StudentMapper接口
+
+```java
+package com.example.dao;
+
+import com.example.domain.Student;
+
+import java.util.List;
+
+public interface StudentMapper {
+    List<Student> selStudentLession();
+}
+```
+
+4. 创建StudentMapper.xml
+
+```xml
+<?xml version="1.0" encoding="UTF8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.dao.StudentMapper">
+    <resultMap id="studentLession" type="Student">
+        <id column="stu_id" property="stu_id"/>
+        <result column="stu_name" property="stu_name"/>
+        <result column="stu_gender" property="stu_gender"/>
+        <result column="stu_age" property="stu_age"/>
+        <result column="lession_id" property="lession_id"/>
+        <association property="lession" javaType="Lession">
+            <id column="lession_id" property="lession_id"/>
+            <result column="lession_name" property="lession_name"/>
+            <result column="lession_teacher" property="lession_teacher"/>
+        </association>
+    </resultMap>
+    <select id="selStudentLession" resultMap="studentLession">
+        select * from `student`, `lession` where `student`.`lession_id` = `lession`.`lession_id`
+    </select>
+</mapper>
+```
+
+5. 配置SqlMapConfig.xml
+
+```xml
+<?xml version="1.0" encoding="UTF8" ?>
+<!DOCTYPE configuration
+        PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+    <!-- 引入外部的properties配置文件 -->
+    <properties resource="jdbc.properties"/>
+    <!-- 配置类型别名 -->
+    <typeAliases>
+        <typeAlias type="com.example.domain.User" alias="User" />
+        <typeAlias type="com.example.domain.Student" alias="Student" />
+        <typeAlias type="com.example.domain.Lession" alias="Lession" />
+    </typeAliases>
+    <!-- 配置数据源 -->
+    <environments default="test01">
+        <environment id="test01">
+            <transactionManager type="JDBC"/>
+            <dataSource type="POOLED">
+                <property name="driver" value="${JDBC_DRIVER}"/>
+                <property name="url" value="${JDBC_URL}"/>
+                <property name="username" value="${JDBC_USERNAME}"/>
+                <property name="password" value="${JDBC_PASSWORD}"/>
+            </dataSource>
+        </environment>
+    </environments>
+    <mappers>
+        <!-- <mapper resource="UserMapper.xml"/> -->
+        <!-- <mapper resource="UserMapperInterface.xml"/> -->
+        <mapper resource="StudentMapper.xml"/>
+    </mappers>
+</configuration>
+```
+
+6. 添加测试类MyBatisStudentTest.java
+
+```java
+package com.example.test;
+
+import com.example.dao.StudentMapper;
+import com.example.domain.Student;
+import org.apache.ibatis.io.Resources;
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.apache.ibatis.session.SqlSessionFactoryBuilder;
+import org.junit.Before;
+import org.junit.Test;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
+
+public class MyBatisStudentTest {
+    private SqlSession sqlSession;
+    private StudentMapper mapper;
+
+    @Before
+    public void before() throws IOException {
+        // 获取核心配置文件
+        InputStream resourceAsStream = Resources.getResourceAsStream("SqlMapConfig.xml");
+        // 获取session工厂对象
+        SqlSessionFactory sqlSessionFactory = new SqlSessionFactoryBuilder().build(resourceAsStream);
+        // 获取session会话对象
+        sqlSession = sqlSessionFactory.openSession();
+        mapper = sqlSession.getMapper(StudentMapper.class);
+    }
+
+    @Test
+    public void test01() {
+        List<Student> students = mapper.selStudentLession();
+        for (Student stu : students) {
+            System.out.println(stu);
+        }
+    }
+}
+```
+
+## 2) 1对多关系
+
+1. Lession实体类添加`private List<Student> studentList`属性
+
+```java
+package com.example.domain;
+
+import java.util.List;
+
+public class Lession {
+    private Integer lession_id;
+    private String lession_name;
+    private String lession_teacher;
+    private List<Student> studentList;
+
+    public Lession() {
+    }
+
+    public Lession(String lession_name, String lession_teacher) {
+        this.lession_name = lession_name;
+        this.lession_teacher = lession_teacher;
+    }
+
+    public Lession(Integer lession_id, String lession_name, String lession_teacher) {
+        this.lession_id = lession_id;
+        this.lession_name = lession_name;
+        this.lession_teacher = lession_teacher;
+    }
+
+    public Integer getLession_id() {
+        return lession_id;
+    }
+
+    public void setLession_id(Integer lession_id) {
+        this.lession_id = lession_id;
+    }
+
+    public String getLession_name() {
+        return lession_name;
+    }
+
+    public void setLession_name(String lession_name) {
+        this.lession_name = lession_name;
+    }
+
+    public String getLession_teacher() {
+        return lession_teacher;
+    }
+
+    public void setLession_teacher(String lession_teacher) {
+        this.lession_teacher = lession_teacher;
+    }
+
+    public List<Student> getStudentList() {
+        return studentList;
+    }
+
+    public void setStudentList(List<Student> studentList) {
+        this.studentList = studentList;
+    }
+
+    @Override
+    public String toString() {
+        return "Lession{" +
+                "lession_id=" + lession_id +
+                ", lession_name='" + lession_name + '\'' +
+                ", lession_teacher='" + lession_teacher + '\'' +
+                ", studentList=" + studentList +
+                '}';
+    }
+}
+```
+
+2. 创建LessionMapper接口
+
+```java
+package com.example.dao;
+
+import com.example.domain.Lession;
+
+import java.util.List;
+
+public interface LessionMapper {
+    List<Lession> selLession();
+}
+```
+
+3. 创建LessionMapper.xml
+
+```xml
+<?xml version="1.0" encoding="UTF8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.dao.LessionMapper">
+    <resultMap id="lessionStudentMap" type="Lession">
+        <id column="lession_id" property="lession_id"/>
+        <result column="lession_name" property="lession_name"/>
+        <result column="lession_teacher" property="lession_teacher"/>
+        <collection property="studentList" ofType="Student">
+            <id column="stu_id" property="stu_id"/>
+            <result column="stu_name" property="stu_name"/>
+            <result column="stu_gender" property="stu_gender"/>
+            <result column="stu_age" property="stu_age"/>
+        </collection>
+    </resultMap>
+    <select id="selLession" resultMap="lessionStudentMap">
+        select * from `lession`, `student` where `lession`.`lession_id` = `student`.`lession_id`
+    </select>
+</mapper>
+```
+
+4. 修改SqlMapConfig.xml配置
+
+```xml
+<?xml version="1.0" encoding="UTF8" ?>
+<!DOCTYPE configuration
+        PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+    <!-- 引入外部的properties配置文件 -->
+    <properties resource="jdbc.properties"/>
+    <!-- 配置类型别名 -->
+    <typeAliases>
+        <typeAlias type="com.example.domain.User" alias="User" />
+        <typeAlias type="com.example.domain.Student" alias="Student" />
+        <typeAlias type="com.example.domain.Lession" alias="Lession" />
+    </typeAliases>
+    <!-- 配置数据源 -->
+    <environments default="test01">
+        <environment id="test01">
+            <transactionManager type="JDBC"/>
+            <dataSource type="POOLED">
+                <property name="driver" value="${JDBC_DRIVER}"/>
+                <property name="url" value="${JDBC_URL}"/>
+                <property name="username" value="${JDBC_USERNAME}"/>
+                <property name="password" value="${JDBC_PASSWORD}"/>
+            </dataSource>
+        </environment>
+    </environments>
+    <mappers>
+        <!-- <mapper resource="UserMapper.xml"/> -->
+        <!-- <mapper resource="UserMapperInterface.xml"/> -->
+        <!-- <mapper resource="StudentMapper.xml"/> -->
+        <mapper resource="LessionMapper.xml"/>
+    </mappers>
+</configuration>
+```
+
+5. 添加测试
+
+```java
+@Test
+public void test02() {
+	LessionMapper mapper = sqlSession.getMapper(LessionMapper.class);
+	List<Lession> lessions = mapper.selLession();
+	for (Lession lession : lessions) {
+		System.out.println(lession);
+	}
+}
+// Lession{lession_id=1, lession_name='itjava', lession_teacher='aa', studentList=[Student{stu_id=1, stu_name='rose', stu_gender='0', stu_age=17, lession_id=null, lession=null}, Student{stu_id=3, stu_name='lily', stu_gender='0', stu_age=16, lession_id=null, lession=null}]}
+// Lession{lession_id=2, lession_name='itgolang', lession_teacher='bb', studentList=[Student{stu_id=2, stu_name='jack', stu_gender='1', stu_age=18, lession_id=null, lession=null}]}
+```
+
+## 3) 多对多关系
+
+1. 修改Student实体类
+
+```java
+package com.example.domain;
+
+import java.util.List;
+
+public class Student {
+    private Integer stu_id;
+    private String stu_name;
+    private String stu_gender;
+    private Integer stu_age;
+    // private Integer lession_id;
+    // private Lession lession;
+    private List<Lession> lessions;
+
+    public Student() {
+    }
+
+    public Student(String stu_name, String stu_gender, Integer stu_age, List<Lession> lessions) {
+        this.stu_name = stu_name;
+        this.stu_gender = stu_gender;
+        this.stu_age = stu_age;
+        this.lessions = lessions;
+    }
+
+    public Student(Integer stu_id, String stu_name, String stu_gender, Integer stu_age, List<Lession> lessions) {
+        this.stu_id = stu_id;
+        this.stu_name = stu_name;
+        this.stu_gender = stu_gender;
+        this.stu_age = stu_age;
+        this.lessions = lessions;
+    }
+
+    public List<Lession> getLessions() {
+        return lessions;
+    }
+
+    public void setLessions(List<Lession> lessions) {
+        this.lessions = lessions;
+    }
+
+    public Integer getStu_id() {
+        return stu_id;
+    }
+
+    public void setStu_id(Integer stu_id) {
+        this.stu_id = stu_id;
+    }
+
+    public String getStu_name() {
+        return stu_name;
+    }
+
+    public void setStu_name(String stu_name) {
+        this.stu_name = stu_name;
+    }
+
+    public String getStu_gender() {
+        return stu_gender;
+    }
+
+    public void setStu_gender(String stu_gender) {
+        this.stu_gender = stu_gender;
+    }
+
+    public Integer getStu_age() {
+        return stu_age;
+    }
+
+    public void setStu_age(Integer stu_age) {
+        this.stu_age = stu_age;
+    }
+
+    @Override
+    public String toString() {
+        return "Student{" +
+                "stu_id=" + stu_id +
+                ", stu_name='" + stu_name + '\'' +
+                ", stu_gender='" + stu_gender + '\'' +
+                ", stu_age=" + stu_age +
+                ", lessions=" + lessions +
+                '}';
+    }
+}
+```
+
+2. 创建StudentLessonsMapper接口
+
+```java
+package com.example.dao;
+
+import com.example.domain.Student;
+
+import java.util.List;
+
+public interface StudentLessonsMapper {
+    List<Student> selStudentLessons();
+}
+```
+
+3. 创建 StudentLessonsMapper.xml
+
+```xml
+<?xml version="1.0" encoding="UTF8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.dao.StudentLessonsMapper">
+    <resultMap id="stuLess" type="Student">
+        <id column="stu_id" property="stu_id"/>
+        <result column="stu_name" property="stu_name"/>
+        <collection property="lessions" ofType="Lession">
+            <id column="lession_id" property="lession_id"/>
+            <result column="lession_name" property="lession_name"/>
+        </collection>
+    </resultMap>
+    <select id="selStudentLessons" resultMap="stuLess">
+        select `student`.`stu_id`, `student`.`stu_name`, `lession`.`lession_id`, `lession`.`lession_name` from `student`, `student_sel_lesson` as `sl`, `lession` where `student`.`stu_id` = `sl`.`stu_id` and `lession`.`lession_id` = `sl`.`lesson_id`;
+    </select>
+</mapper>
+```
+
+4. 修改SqlMapConfig配置
+
+```xml
+<mappers>
+	<!-- <mapper resource="UserMapper.xml"/> -->
+	<!-- <mapper resource="UserMapperInterface.xml"/> -->
+	<!-- <mapper resource="StudentMapper.xml"/> -->
+	<!-- <mapper resource="LessionMapper.xml"/> -->
+	<mapper resource="StudentLessonsMapper.xml"/>
+</mappers>
+```
+
+5. 添加测试
+
+```java
+@Test
+public void test03() {
+	StudentLessonsMapper mapper = sqlSession.getMapper(StudentLessonsMapper.class);
+	List<Student> students = mapper.selStudentLessons();
+	for (Student stu : students) {
+		System.out.println(stu);
+	}
+}
+```
 
 
+# 9. MyBatis注解
+
+## 1) 常用注解
+
+- @Select 查询
+- @Insert 插入
+- @Update 修改
+- @Delete 删除
+- @Result 结果集封装
+- @Results 结果集封装（结合@Result使用）
+- @One 一对一结果集封装
+- @Many 一对多结果集封装
+
+## 2) 操作方法
+
+### a. 基本CRUD
+
+1. 配置SqlMapConfig.xml
+
+```xml
+<?xml version="1.0" encoding="UTF8" ?>
+<!DOCTYPE configuration
+        PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+    <!-- 引入外部的properties配置文件 -->
+    <properties resource="jdbc.properties"/>
+    <!-- 配置类型别名 -->
+    <typeAliases>
+        <typeAlias type="com.example.domain.User" alias="User" />
+        <typeAlias type="com.example.domain.Student" alias="Student" />
+        <typeAlias type="com.example.domain.Lession" alias="Lession" />
+    </typeAliases>
+    <!-- 配置数据源 -->
+    <environments default="test01">
+        <environment id="test01">
+            <transactionManager type="JDBC"/>
+            <dataSource type="POOLED">
+                <property name="driver" value="${JDBC_DRIVER}"/>
+                <property name="url" value="${JDBC_URL}"/>
+                <property name="username" value="${JDBC_USERNAME}"/>
+                <property name="password" value="${JDBC_PASSWORD}"/>
+            </dataSource>
+        </environment>
+    </environments>
+    <!-- <mappers> -->
+    <!--     &lt;!&ndash; <mapper resource="UserMapper.xml"/> &ndash;&gt; -->
+    <!--     &lt;!&ndash; <mapper resource="UserMapperInterface.xml"/> &ndash;&gt; -->
+    <!--     &lt;!&ndash; <mapper resource="StudentMapper.xml"/> &ndash;&gt; -->
+    <!--     &lt;!&ndash; <mapper resource="LessionMapper.xml"/> &ndash;&gt; -->
+    <!--     &lt;!&ndash; <mapper resource="StudentLessonsMapper.xml"/> &ndash;&gt; -->
+    <!-- </mappers> -->
+
+    <!-- 配置扫描包 -->
+    <mappers>
+        <package name="com.example.dao"/>
+    </mappers>
+</configuration>
+```
+
+2. 在UserMapper接口添加注解
+
+```java
+package com.example.dao;
+
+import com.example.domain.User;
+import org.apache.ibatis.annotations.Delete;
+import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
+
+import java.util.List;
+
+public interface UserMapper {
+    @Select("select * from `user`")
+    List<User> selAllUser();
+    @Select("select * from `user` where name=#{name}")
+    User selUser(String name);
+    @Insert("insert into user (name, password, status) value (#{name}, #{password}, #{status})")
+    void add(User user);
+    @Update("update user set password=#{password}, status=#{status} where name=#{name}")
+    void update(User user);
+    @Delete("delete from user where name=#{name}")
+    void delete(String name);
+}
+```
+
+3. 运行测试
+
+```java
+package com.example.test;
+
+import com.example.dao.UserMapper;
+import com.example.domain.User;
+import org.apache.ibatis.io.Resources;
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.apache.ibatis.session.SqlSessionFactoryBuilder;
+import org.junit.Before;
+import org.junit.Test;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
+
+public class MyBatisInterfaceTest {
+    private SqlSession sqlSession;
+    private UserMapper mapper;
+    @Before
+    public void before() throws IOException {
+        // 获取核心配置文件
+        InputStream resourceAsStream = Resources.getResourceAsStream("SqlMapConfig.xml");
+        // 获取session工厂对象
+        SqlSessionFactory sqlSessionFactory = new SqlSessionFactoryBuilder().build(resourceAsStream);
+        // 获取session会话对象
+        sqlSession = sqlSessionFactory.openSession();
+        // 获取mapper实例
+        mapper = sqlSession.getMapper(UserMapper.class);
+    }
+
+    @Test
+    public void test01() {
+        List<User> users = mapper.selAllUser();
+        for (User user : users) {
+            System.out.println(user);
+        }
+    }
+
+    @Test
+    public void test02() {
+        User root = mapper.selUser("root");
+        System.out.println(root);
+    }
+
+    @Test
+    public void test03() {
+        mapper.add(new User("rally", "rally", "2"));
+    }
+
+    @Test
+    public void test04() {
+        mapper.update(new User("rally", "000", "2"));
+    }
+
+    @Test
+    public void test05() {
+        mapper.delete("rally");
+    }
+}
+```
+
+### b. 注解过script实现动态SQL
+
+```java
+@Select({
+		"<script>",
+			"select * from `user`",
+			"<where>",
+				"<if test='id!=null'>id=#{id}</if>",
+				"<if test='name!=null'>name=#{name}</if>",
+			"</where>",
+		"</script>"
+})
+List<User> selBySomething(User user);
+```
+
+```java
+@Test
+public void test06() {
+	List<User> users = mapper.selBySomething(new User(1,null, null, "0"));
+	for (User user : users) {
+		System.out.println(user);
+	}
+}
+```
+
+### c. 多表操作
+
+#### 1对1
+
+1. LessionMapper.java
+
+```java
+package com.example.dao;
+
+import com.example.domain.Lession;
+import org.apache.ibatis.annotations.Select;
+
+public interface LessionMapper {
+    @Select("select * from `lession` where `lession_id` = #{lession_id}")
+    Lession selLessionById(int lession_id);
+}
+```
+
+2. StudentMapper.java
+
+```java
+package com.example.dao;
+
+import com.example.domain.Lession;
+import com.example.domain.Student;
+import org.apache.ibatis.annotations.One;
+import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.Results;
+import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
+
+public interface StudentMapper {
+	// @Select("select * from `student`, `lession` where `student`.`lession_id` = `lession`.`lession_id`")  
+	// @Results({  
+	//         @Result(column = "stu_id", property = "stu_id"),  
+	//         @Result(column = "stu_name", property = "stu_name"),  
+	//         @Result(column = "lession_name", property = "lession.lession_name")  
+	// })
+    @Select("select * from `student`")
+    @Results({
+            @Result(column = "stu_id", property = "stu_id"),
+            @Result(column = "stu_name", property = "stu_name"),
+            @Result(
+                    column = "lession_id", // 通过外键进行查询
+                    property = "lession", // 成员名
+                    javaType = Lession.class, // 成员类型
+                    one = @One(select = "com.example.dao.LessionMapper.selLessionById") // 一对一调用的方法
+            )
+    })
+    List<Student> selStudentLession();
+}
+```
+
+3. 测试
+
+```java
+@Test  
+public void test01() {  
+    StudentMapper mapper = sqlSession.getMapper(StudentMapper.class);  
+    List<Student> students = mapper.selStudentLession();  
+    for (Student stu : students) {  
+        System.out.println(stu);  
+    }  
+}
+```
+
+#### 1对多
+
+1. StudentMapper.java
+
+```java
+@Select("select * from `student` where `lession_id` = #{lession_id}")  
+List<Student> selStudentByLessionId(int lession_id);
+```
+
+2. LessionMapper.java
+
+```java
+@Select("select * from `lession`")  
+@Results({  
+        @Result(column = "lession_id", property = "lession_id"),  
+        @Result(column = "lession_name", property = "lession_name"),  
+        @Result(  
+                column = "lession_id",  
+                property = "studentList",  
+                javaType = List.class,  
+                many = @Many(select = "com.example.dao.StudentMapper.selStudentByLessionId")  
+        )  
+})  
+List<Lession> selLessionStudent();
+```
+
+3. 测试
+
+```java
+@Test  
+public void test04() {  
+    LessionMapper mapper = sqlSession.getMapper(LessionMapper.class);  
+    List<Lession> lessions = mapper.selLessionStudent();  
+    for (Lession lession : lessions) {  
+        System.out.println(lession);  
+    }  
+}
+```
+
+#### 多对多
+
+1. LessionMapper.java
+
+```java
+@Select("select `lession`.`lession_id`, `lession_name` from `student_sel_lesson` `sl`, `lession` where #{stu_id} = `sl`.`stu_id` and `lession`.`lession_id` = `sl`.`lesson_id`")  
+List<Lession> selLessionByStuId(int stu_id);
+```
+
+2. StudentMapper.java
+
+```java
+@Select("select `stu_id`, `stu_name` from `student`")  
+@Results({  
+        @Result(column = "stu_id", property = "stu_id"),  
+        @Result(column = "stu_name", property = "stu_name"),  
+        @Result(  
+                column = "stu_id",  
+                property = "lessions",  
+                javaType = List.class,  
+                many = @Many(select = "com.example.dao.LessionMapper.selLessionByStuId")  
+        )  
+})  
+List<Student> selStudentLessionMany();
+```
+
+3. 测试
+
+```java
+@Test  
+public void test05() {  
+    StudentMapper mapper = sqlSession.getMapper(StudentMapper.class);  
+    List<Student> students = mapper.selStudentLessionMany();  
+    for (Student stu : students) {  
+        System.out.println(stu);  
+    }  
+}
+```
+
+
+# 10. MyBatis plus
+
+## 1. 简介
+
+https://www.baomidou.com/pages/24112f/
+
+## 2. 快速上手
 
 
 
