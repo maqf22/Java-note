@@ -1672,8 +1672,228 @@ https://www.baomidou.com/pages/24112f/
 
 ## 2. 快速上手
 
+1. 创建数据表
 
+```sql
+create table `user` (
+	`id` int unsigned not null auto_increment,
+	`name` varchar(30) not null unique,
+	`passowrd` varchar(32) not null,
+	`status` enum('0', '1', '2') default '2',
+	primary key(`id`)
+) engine=MyISAM default charset=utf8;
 
+insert into `user` (`name`, `password`, `status`) values
+('root', 'root', '0'),
+('admin', 'admin', '1'),
+('andy', 'andy', '2');
+```
 
+2. 创建Maven模块MyBatisPlusDemo
 
+3. pom.xml中导入对坐标
+
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.example</groupId>
+    <artifactId>MyBatisPlusDemo</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>MyBatisPlusDemo</name>
+    <url>https://maven.apache.org</url>
+    <modules>
+        <module>MyBatisPlusDemoTest01</module>
+    </modules>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>8.0.32</version>
+        </dependency>
+        <dependency>
+            <groupId>com.mchange</groupId>
+            <artifactId>c3p0</artifactId>
+            <version>0.9.5.5</version>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.13.2</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+            <version>1.2.17</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/com.baomidou/mybatis-plus-boot-starter -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-boot-starter</artifactId>
+            <version>3.5.2</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/org.projectlombok/lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.24</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>
+```
+
+4. 创建子模块MyBatisPlusDemoTest01
+
+5. 在子模块MyBatisPlusDemoTest01添加配置文件
+
+- log4j.properties
+
+```properties
+### direct log messages to stdout ###
+log4j.appender.stdout=org.apache.log4j.ConsoleAppender
+log4j.appender.stdout.Target=system.out
+log4j.appender.stdout.layout=org.apache.log4j.PatternLayout
+log4j.appender.stdout.layout.ConversionPattern=%d{ABSOLUTE} %5p %c{1}:%L - %m%n
+
+### direct messages to file myLog.log ###
+log4j.appender.file=org.apache.log4j.FileAppender
+log4j.appender.file.File=c:/myLog.log
+log4j.appender.file.layout=org.apache.log4j.PatternLayout
+log4j.appender.file.layout.ConversionPattern=%d{ABSOLUTE} %5p %c{1}:%L - %m%n
+### set log levels - for more verbose logging change 'info' to 'debug' ###
+log4j.rootLogger=debug, stdout
+```
+
+- jdbc.properties
+
+```properties
+JDBC_DRIVER=com.mysql.cj.jdbc.Driver
+JDBC_URL=jdbc:mysql://127.0.0.1:3306/mybatis_data?useSSL=true
+JDBC_USERNAME=root
+JDBC_PASSWORD=root
+```
+
+- SqlMapConfig.xml
+
+```xml
+<?xml version="1.0" encoding="UTF8" ?>
+<!DOCTYPE configuration
+        PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+    <!-- 引入外部的properties配置文件 -->
+    <properties resource="jdbc.properties"/>
+    <!-- 配置数据源 -->
+    <environments default="test01">
+        <environment id="test01">
+            <transactionManager type="JDBC"/>
+            <dataSource type="POOLED">
+                <property name="driver" value="${JDBC_DRIVER}"/>
+                <property name="url" value="${JDBC_URL}"/>
+                <property name="username" value="${JDBC_USERNAME}"/>
+                <property name="password" value="${JDBC_PASSWORD}"/>
+            </dataSource>
+        </environment>
+    </environments>
+
+    <!-- 配置扫描包 -->
+    <mappers>
+        <package name="org.example.mapper"/>
+    </mappers>
+</configuration>
+```
+
+6. 创建User实体类
+
+```java
+package org.example.domain;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class User {
+    private Integer id;
+    private String name;
+    private String password;
+    private String status;
+}
+```
+
+7. 创建UserMapper接口
+
+```java
+package org.example.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import org.apache.ibatis.annotations.Select;
+import org.example.domain.User;
+
+import java.util.List;
+
+public interface UserMapper extends BaseMapper<User> {
+	// 自定义
+    @Select("select `id`, `name`, `password`, `status` from `user`")
+    List<User> selectAll();
+}
+```
+
+8. 测试
+
+```java
+package org.example;  
+
+// MyBatis plus 模块
+import com.baomidou.mybatisplus.core.MybatisSqlSessionFactoryBuilder;
+import org.apache.ibatis.io.Resources;  
+import org.apache.ibatis.session.SqlSession;  
+import org.apache.ibatis.session.SqlSessionFactory;  
+import org.example.domain.User;  
+import org.example.mapper.UserMapper;  
+import org.junit.Before;  
+import org.junit.Test;  
+  
+import java.io.IOException;  
+import java.io.InputStream;  
+import java.util.List;  
+  
+public class UserTest {  
+    private UserMapper mapper;  
+    @Before  
+    public void before() throws IOException {  
+        InputStream resourceAsStream = Resources.getResourceAsStream("SqlMapConfig.xml");  
+        SqlSessionFactory sqlSessionFactory = new MybatisSqlSessionFactoryBuilder().build(resourceAsStream);  
+        SqlSession sqlSession = sqlSessionFactory.openSession();  
+        mapper = sqlSession.getMapper(UserMapper.class);  
+    }  
+    @Test  
+    public void test01() {  
+        List<User> users = mapper.selectList(null);  
+        for (User user : users) {  
+            System.out.println(user);  
+        }  
+    }  
+  
+    @Test  
+    public void test02() {  
+        List<User> users = mapper.selectAll();  
+        for (User user : users) {  
+            System.out.println(user);  
+        }  
+    }  
+}
+```
 
