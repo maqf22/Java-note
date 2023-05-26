@@ -770,7 +770,164 @@ public class MyBatisPlusTest {
         Student student = stuMapper.selectById(8);
         System.out.println(student);
     }
-    // TODO...
-}
 
+	@Test
+    public void test10() {
+        ArrayList<Integer> ids = new ArrayList<>();
+        ids.add(1);
+        ids.add(2);
+        ids.add(3);
+        List<Student> students = stuMapper.selectBatchIds(ids);
+        for (Student student : students) {
+            System.out.println(student);
+        }
+    }
+
+    @Test
+    public void test11() {
+        HashMap<String, Object> map = new HashMap<>();
+        map.put("name", "Jack");
+        map.put("age", 19);
+        List<Student> students = stuMapper.selectByMap(map);
+        for (Student student : students) {
+            System.out.println(student);
+        }
+    }
+
+    @Test
+    public void test12() {
+        Student student = new Student();
+        student.setId(1);
+        QueryWrapper<Student> sqw = new QueryWrapper<>(student);
+        Student stu = stuMapper.selectOne(sqw);
+        System.out.println(stu);
+    }
+
+    @Test
+    public void test13() {
+        QueryWrapper<Student> sqw = new QueryWrapper<>();
+        sqw.ge("age", 17);
+        Long count = stuMapper.selectCount(sqw);
+        System.out.println(count);
+    }
+
+    @Test
+    public void test14() {
+        QueryWrapper<Student> sqw = new QueryWrapper<>();
+        sqw.le("age", 19);
+        List<Student> students = stuMapper.selectList(sqw);
+        for (Student student : students) {
+            System.out.println(student);
+        }
+    }
+}
 ```
+
+> QueryWrapper常用方法：https://www.baomidou.com/pages/10c804/#abstractwrapper
+
+
+# 四、分页操作
+
+`ApplicationContext.xml`配置分页插件
+
+```xml
+<!-- 整合MyBatis-plus -->
+<bean id="sessionFactory" class="com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean">
+	<property name="dataSource" ref="dataSource"/>
+	<!-- 插件注册 -->
+	<property name="plugins">
+		<array>
+			<ref bean="mybatisPlusInterceptor"/>
+		</array>
+	</property>
+</bean>
+
+<bean id="mybatisPlusInterceptor" class="com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor">
+	<property name="interceptors">
+		<list>
+			<ref bean="paginationInnerInterceptor"/>
+		</list>
+	</property>
+</bean>
+<bean id="paginationInnerInterceptor"
+	  class="com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor">
+	<!-- 对于单一数据库类型来说,都建议配置该值,避免每次分页都去抓取数据库类型 -->
+	<constructor-arg name="dbType" value="H2"/>
+</bean>
+```
+
+测试
+
+```java
+@Test  
+public void test15() {  
+    Page<Student> page = new Page<>(1, 2);//第一页，两条数据  
+    Page<Student> iPage = stuMapper.selectPage(page, null);  
+    System.out.println("当前查询的总页数：" + iPage.getPages());  
+    System.out.println("结果的数量：" + iPage.getTotal());  
+    System.out.println("当前的页码：" + iPage.getCurrent());  
+    List<Student> stuList = iPage.getRecords();  
+    for (Student student : stuList) {  
+        System.out.println(student);  
+    }  
+}
+```
+
+
+# 五、MyBatis-Plus配置
+
+> https://www.baomidou.com/pages/56bac0/#%E5%9F%BA%E6%9C%AC%E9%85%8D%E7%BD%AE
+
+
+# 六、ActiveRecord
+
+1. 继承`com.baomidou.mybatisplus.extension.activerecord.Model`
+
+> 以前步骤仍然需要，低层就是使用`Mapper`
+
+```java
+package com.example.domain;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.extension.activerecord.Model;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@TableName("stu")
+public class Student extends Model<Student> {
+    @TableId(type= IdType.AUTO) // 设置主键自增的策略
+    private int id;
+    private String name;
+    private String sex;
+    @TableField(select = false) // 查询的时候不想被看到
+    private Integer age;
+    private Float score;
+    private String tel;
+    @TableField("classId") // 当字段名和成员名不一致时使用
+    private String classId;
+    // @TableField(exist = false) // 这个成员在数据库里不存在，查询的时候被忽略
+    // private String other;
+}
+```
+
+2. 使用
+
+```java
+// 插入一条数据
+@Test
+public void test16() {
+	Student student = new Student();
+	student.setName("OuYangFen");
+	student.setTel("13660048197");
+	boolean b = student.insert();
+	System.out.println(b);
+}
+```
+
