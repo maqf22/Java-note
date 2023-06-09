@@ -547,6 +547,406 @@ gpgcheck=0  # 设置rpm验证不生效
 
 ## 3. 进程管理
 
+### 1) 终止进程
+
+- kill命令
+```linux
+kill PID -9  # -9 表示强制结束进程
+```
+
+- pstree
+```linux
+killall -9 进程名`  # 结束一类进程
+pkill -9 进程名  # 结束一个进程
+pkill -9 -t 终端号  # 把某个终端登录的用户踢出
+pkill -9 -t tty1  # 把本地登录终端1用户踢出
+```
+
+### 2) 循环定时任务
+
+```linux
+crontab -e  # 编辑定时任务
+crontab -l  # 查看系统定时任务
+crontab -r  # 删除定时任务
+
+格式：* * * * * 命令
+其中：
+	第1位：一小时中第几分钟  0 - 59
+	第2位：一天中第几个小时  0 - 23
+	第3位：一个月中的第几天  1 - 31
+	第4位：一年中的第几个月  1 - 12
+	第5位：一周中的第几天    0 - 6
+
+examples:
+10 * 31 * * 命令   # 每个月31号的每个小时里的第10分钟要执行一个命令
+10 * * * * 命令   # 每个小时的第十分钟要执行一个命令
+5 4 * 5,7,10 * 命令   # 每年的5、7、10月的4点5分要执行一个命令
+*/10 * * * * 命令   # 每10分钟执行一个命令
+```
+
+> [!注意事项]
+> *定时任务选项都不能为空，必须填入；*
+> *不知道的值使用通配符\*表示任何时间；*
+> *每个时间段都可以提定多个值，不连续的值使用逗号间隔；*
+> *连续的值用减号间隔，间隔固定时间执行书写为\*/n格式；*
+> *命令应该给出绝对路径，星期几和第几天不要同时出现；*
+> *最小时间范围是分钟，最大时间范围是月*
+
+
+# 六、Linux服务管理
+
+## 1. Linux中的服务分类
+
+1. 系统默认安装的服务
+2. 源码包安装的服务
+
+## 2. 系统默认安装的服务
+
+- 确定服务分类
+	- `chkconfig --list` 查看服务的自启状态
+	- 运行级别：0 - 6
+		- 0：关机
+		- 1：单用户模式
+		- 2：不完全的多用户模式，不包含NFS服力，无网络登录
+		- 3：完全的多用户字符界面
+		- 4：未分配（保留）
+		- 5：图形界面（启动图形界面可使用`startx`或`init 5`）
+		- 6：重新启动
+	- runlevel：查询系统当前运行级别
+	- 配置文件：/etc/inittab
+
+- 独立的服务管理器
+	- 启动服务
+		1. `/etc/rc.d/init.d/服务名 start | stop | restart | status`
+		2. `service 服务名 start | stop | restart | status`
+	- 设置自启动
+		1. `chkconfig --level 2345 服务名 on | off`
+		2. 编辑配置文件：`/etc/rc.local -> /etd/rc.d/rc.local`
+	- `ntsysv`命令（Redhat系列可用）
+		- 所有系统默认安装的服务都可以通过`ntsysv`命令进行自启动管理
+
+
+# 七、Linux文件服务器
+
+> FTP服务器（File Transfer Protocol Serveer）是在互联网上提供文件存储和访问服务的计算机，它们依照FTP协议提供服务。FTP是File Transfer Protocol（文件传输协议）。顾名思义，就是专门用来传输文件的协议。简单地说，支持FTP协议的服务器就是FTP服务器
+
+- ftp：在内网和公网使用
+	- 服务器：Windows Liunx
+	- 客户端：Windows Linux
+
+## 1. 安装
+
+`yum -y install vsftpd`
+
+## 2. 配置文件
+
+- `/etc/sysconfig/selinux` **关闭selinux之后ftp才能正常连接**
+- `/etc/vsftpd/vsftpd.config` ftp配置文件
+- `/etc/vsftpd/ftpusers` 用户访问控制
+- `/etc/vsftpd/chroot_list` 需要手动创建，用于家目录限制
+
+## 3. 配置文件修改
+
+- `local_enable=YES` 允许系统用户登录
+- `write_enable=YES` 允许上传
+- `local_umak=022` 默认上传权限
+- `local_max_reate=300` 上传限速
+- 主机相关配置
+	- `Listen_port=21` 监听端口
+	- `connect_from_port_20` 数据传输端口
+	- `ftpd_banner` 欢迎信息
+	- 匿名用户登录（在Linux中识别为ftp用户）
+	- `anonymous_enable=YES` 允许匿名用户登录
+- **限制用户访问目录**
+	- `chroot_local_user=YES`
+		- **注：如果只有此句生效，所有用户限制在家目录**
+	- `chroot_list_enable=YES`
+	- `chroot_list_file=/etc/vsftpd/chroot_list`
+	- `allow_writeable_chroot=YES`
+		- **注：如果以上都生效，只有chroot_list文件中的用户可以访问其他目录，其他用户限制在家目录当中**
+
+
+## 4. ftp客户端的使用
+
+1. 在MS-DOS中登录ftp
+	- `ftp xxxx.xxxx.xxxx.xxxx` 连接ftp服务器
+	- `get filename` 下载文件
+	- `put filename` 上传文件
+	- `help`或`?`查看ftp指令
+
+> 注意：上传和下载操作不支持目录
+
+2. 在windows中登录ftp
+3. 使用第三方工具登录
+
+
+## 5. Samba文件服务器
+
+> samba服务器是一种在局域网中常用的共享文件服务器
+> 使用该服务器需要smbd和nmbd两种服务的支持
+
+- smb为client提供资源访问 tcp 139 445
+- nmb提供netbios主机名解析 udp 134 138
+
+## 6. 安装相关的软件包
+
+1. 配置yum安装环境
+2. `yum -y install samba`
+
+## 7. Samba配置文件
+
+`/etc/samba/smb.conf`配置文件中有两种注释风格分别为`#`和`;`
+
+## 8. 共享目录设置
+
+> share definitions
+
+- \[目录名\] \#非路径
+- comment = 目录描述
+- browseable = 目录是否对用户可见
+- writable = 可写（与系统目录权限相对应）
+- valid users = 用户限制（针对于哪个用户可用）
+- path = 目录（指定的共享目录位置）
+
+## 9. 实例
+
+> 实现两个目录的共享，一个是pub目录，位置/pub，所有用户都能进行访问、上传；
+> 另一个是soft目录，位置/soft，只有maqf用户可以访问、上传、其他用户不能对其访问；
+
+实现步骤
+
+1. 编辑配置文件`/etc/samba/smb.conf`
+
+2. 在配置文件中添加内容
+```conf
+[pub]
+	browseable = yes
+	path = /pub
+	writable = yes
+[soft]
+	browseable = yes
+	path = /soft
+	writable = yes
+```
+
+3. 在终端中执行以下命令
+
+```cmd
+mkdir /pub
+mkdir /soft
+chmod 777 /pub
+chmod 700 /soft
+useradd maqf
+passwd maqf
+chown maqf /soft
+```
+
+4. 把系统用户声明为Samba用户
+
+```
+smbpasswd -a maqf  # 声明一个系统用户为Samba用户
+smbpasswd -x username  # 删除一个Samba用户
+pdbedit -L  # 查看Samba用户
+```
+
+5. 重启服务 
+
+```
+service smb restart
+service nmb restart
+```
+
+6. 测试搭建结果
+
+- 在winodws中使用共享登录方式：`\\192.168.2.59`（`net use * /del`清除登录状态）
+- 在Linux中登录指令：`smbclient //192.168.2.59/soft -U maqf`
+
+
+# 八、Linux用户管理
+
+## 1. 用户管理相关配置文件
+
+### 1) `/etc/passwd`
+
+> 用于查看用户信息
+
+- 时间戳换算日期`date -d "1970-01-01 17056 days"`
+- 日期换算时间戳`echo $(($(date --date="2023-06-09" +%s) / 8400 + 1))`
+- 配置文件内容
+	- 第一列：用户名
+	- 第二列：密码状态
+	- 第三列：用户UID
+		- 0：root用户（超级用户）
+		- 1-499：伪用户（系统用户）
+		- 500-65535：普通用户
+	- 第四列：初始组ID
+	- 第五列：用户说明信息
+	- 第六列：用户的家目录所在路径
+	- 第七列：用户使用的指令解析器
+
+### 2) `/etc/shadow`
+
+> 影子文件，用于存放用户的密码信息
+
+- 配置文件内容
+	- 第一列：用户名
+	- 第二列：加密后的密码串
+		- 加密算法升级为SHA512散列加密算法
+		- 如果密码是以`!!`或`*`代表没有密码或密码不可用，不允许登录
+	- 第三列：密码最后一次修改日期
+	- 第四列：两次密码的修改间隔时间（与第三列相比）
+	- 第五列：密码有效期（与第三列相比）
+	- 第六列：密码修改到期的警告天数（与第五列相比）
+	- 第七列：密码过期后的宽限天数（与第五列相比）
+		- 0：表示密码过期后立即失效
+		- -1：表示密码永不过期
+	- 第八列：账号失效时间（用时间戳表示）
+	- 第九列：保留
+
+### 3) 其他文件
+
+- `/etc/group` 用于查看用户的组信息
+- `/etc/gshadow` 用于查看用户的组密码信息
+- `/etc/skel/` 用户的家目录模板
+- `/var/spool/mail` 目录中存了用户的mail文件
+
+## 2. 用户管理命令
+
+1. 添加用户`useradd 用户名`
+	- 参数
+		- -g  组名（指定初组）
+		- -G  组名（指定附加组，把用户加入组，使用附加组）
+		- -c  说明（为用户添加说明信息）
+		- -d  目录名（手动指定家目录，家目录不需要建立在`/home/`）
+		- -s  指令解析器（手动指定用户登录时使用的指令解析器`shell`）
+		- 用户默认值配置文件`/etc/default/useradd`和`/etc/login.defs`
+
+2. 设置密码`passwd 用户名`
+	- 参数
+		- -S  查询用户的密码状态，仅root用户可用
+		- -l  临时锁定用户，仅root用户可用
+		- -u  临时解锁用户，仅root用户可用
+
+3. 删除用户`userdel 用户名`
+	- 参数
+		- -r 连带目录用户的家目录一同删除
+
+4. 添加用户组`groupadd 用户组名`
+	- 参数
+		- -g GID  (修改ID)
+		- -n 新组名 （修改组名，新组名在前，原组名在后）
+
+5. 删除用户组`groupdel 用户组名`
+	- 注意：删除组的时候，组当中不能有初始用户
+
+6. 将已存在的用户加入组
+	- `gpasswd -a 用户名 组名`  将用户加入组
+	- `gpasswd -d 用户名 组名`  将用户从组中移除
+
+7. 切换用户`su 用户名`
+	- 连带环境变量一同切换加一个横杠`-`
+		- 例如：`su - maqf` 切换用户的使用，同时使用maqf的专属环境变量
+	- 只有使用root用户切换到其他用户的时候不需要使用密码
+	- 附加：**`sudo`命令，需要修改`/etc/sudoers`配置文件，添加想要扩展权限的用户名**
+
+8. 修改用户信息`usermod 用户名`
+	- 参数
+		- -u  修改用户UID
+		- -c  修改用户的说明信息
+		- -G  修改用户的附加组
+		- -L  临时锁定用户
+		- -U  临时解锁用户
+
+9. 修改密码状态`chage 用户名`
+	- 参数
+		- -l  （列出用户的详细信息密码状态）
+		- -d 日期 （修改密码最后一次更改日期）
+		- -m 天数  （修改两次密码修改间隔时间）
+		- -M 天数  （密码有效期）
+		- -W 天数  （密码过期前警告天数）
+
+
+## 3. ACL权限
+
+> 针对用户身份不够用的权限解决方案
+
+### 1) 查看分区是否支持ACL
+
+- `df -h`  查看文件系统
+- `dumpe2fs -h 分区`  查看分区信息
+- `mount -o remount,acl /`  重新挂载分区并添加ACL支持
+- `vi /etc/fstab`  修改文件，永久生效
+
+### 2) 设定ACL权限
+
+`setfacl [选项] 文件名`
+
+- 参数
+	- -m  设定ACL权限
+	- -x  删除指定的ACL权限
+	- -b 删除所有的ACL权限
+	- -d  设定默认ACL权限
+	- -k  删除默认ACL权限
+	- -R  递归设定ACL权限（跟在权限后面）
+
+### 3) 查看ACL权限
+
+`getfacl 文件名`
+
+```
+# example:
+useradd user1
+useradd user2
+useradd userTemp
+# 以上为创建三个用户
+groupadd dev  # 创建dev用户组
+mkdir /project  # 创建project目录
+chown root.dev /project  # 修改project文件所属组
+chmod 770 /project  # 修改project目录访问权限
+setfacl -m u:userTemp:rx /project  # 为用户设置ACL权限
+# 其中u表示为用户设定、g为组设定、m为mask设定
+```
+
+
+# 九、Linux防火墙
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
