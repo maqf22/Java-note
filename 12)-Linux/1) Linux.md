@@ -910,6 +910,109 @@ setfacl -m u:userTemp:rx /project  # 为用户设置ACL权限
 
 # 九、Linux防火墙
 
+## 1. 五个规则链
+
+1. PREROUTING - 路由前
+2. INPUT - 数据包流入口
+3. FORWARD - 转发管卡
+4. OUTPUT - 数据包流出口
+5. POSTROUTING - 路由后
+
+## 2. 工作功能和处理方式
+
+常用的功能有以下三种：
+
+- Filter：定义允许或不允许
+	- 对于filter来讲一般只能在3个链上：INPUT / FORWARD / OUTPUT
+- Nat：定义地址转换
+	- 对于nat来讲一般也只能在三个链上：PREROUTING / OUTPUT / POSTROUTING
+- Mangle：修改报文元数据
+	- Mangle则是5个链都可以做
+
+## 3. 规则的写法
+
+`iptables [-t table] COMMAND [chain] CRETIRIA -j ACTION`
+
+- `-t table`：3个filter nat mangle
+- `COMMAND`：定义如何对规则进行管理
+- `chain`：指定接下来的规则到底是哪个链上的操作，定义策略时可省略
+- `CRETIRIA`：指定匹配标准
+- `-j ACTION`：指定如何处理
+
+## 4. 连接管理命令
+
+- `-A`：追加规则
+- `-l`：插入规则
+- `-P`：设置默认策略（默认开门还是关门）
+	- 默认一般只两种（DROP | ACCEPT）
+- `-F`：清空规则链（FLASH）
+
+## 5. 查看管理命令
+
+- `-n`：以数字形式查看
+- `-v`：查看相关信息（-vv -vvv）
+- `--line-number`：显示规则ID号
+
+## 6. 详细匹配标准
+
+通用匹配：源地目标地址的匹配
+
+- `-s`：指定作为原地址匹配，不能使用主机名只能是IP地址
+- `-d`：表示目录地址
+- `-P：匹配协议（TCP | UDP | ICMP）
+- `-i`：指定网卡（eth0 | lo）流入 --- input
+- `-o`：指定网卡流出 --- output
+
+扩展匹配：
+
+- `--dport`：指定流入端口（必须同时指定协议）
+- `--sport`：指定流出端口（必须同时指定协议）源
+
+## 7. 详解 `-j ACTION`
+
+常见的ACTION
+
+- `DROP`：直接丢弃（不给浏览器任何反馈）
+- `REJECT`：明示拒绝
+- `ACCEPT`：接受
+
+## 8. 保存防火墙设置
+
+`service iptables save` （不同Liunx版本支持程度不同）
+`iptable-save`
+`iptable-save > /etc/sysconfig/iptables`
+
+## 9. 案例
+
+```
+iptalbes -A INPUT -s 192.168.2.58 -j ACCEPT  # 允许本机ip地址对Linux进行访问
+iptables -A INPUT -p tcp --dport 80 -j DROP  # 禁止通过TCP协议对80端口进行访问
+```
+
+```shell
+#!/bin/bash
+#setting iptables
+
+#允许80端口input\output
+#默认input/output不允许
+#本地操作
+
+IPT=/sbin/iptables
+
+$IPT -F
+
+$IPT -A INPUT -p tcp --dport 22 -j ACCEPT
+$IPT -A INPUT -p tcp --dport 80 -j ACCEPT
+$IPT -P INPUT DROP
+
+$IPT -A OUTPUT -p tcp --dport 22 -j ACCEPT
+$IPT -A OUTPUT -p tcp --dport 80 -j ACCEPT
+$IPT -P OUTPUT DROP
+
+$IPT-save > /etc/sysconfig/iptables
+```
+
+
 
 
 
