@@ -385,6 +385,353 @@ dir /home/maqf/redisData
 `ps -ef | grep redis`
 
 
+# 八、持久化
+
+- RDB - 记录快照：当前啥样就保存成啥样
+- AOF - 记录过程：保存所有操作过程
+
+## 1. RDB模式（快照）
+
+- RDB模式 使用save做持久化操作
+
+配置 | 说明
+:- | :-
+`dbfilename dump.rdb` | 设置和本地数据库文件名，默认值为dump.rdb-(dump.端口号.rdb)
+`dir` | 设置存储.rdb文件的路径
+`rdbcompression yes` | 设置存储时是否进行压缩，默认为yes
+`rdbchecksum yes` | 设置是否进行RDB文件格式校验，默认开启
+
+`/etc/redis/redis-6379.conf`
+
+```conf
+daemonize yes
+bind 127.0.0.1
+port 6379
+logfile /root/redisData/redis-6379.log
+dir /root/redisData
+dbfilename dump.6379.rdb
+rdbcompression yes
+rdbchecksum yes
+```
+
+> 不建议直接使用save命令，因为可能会产生命令的阻塞，可以使用bgsave后台保存，可以解决阻塞问题 
+
+配置 | 说明
+:- | :-
+`stop-writes-on-bgsave-error yes` | 后台存储过程中如果出现错误，是否停止，默认使用开启
+`save second changes` | 满足的限定时间范围内key的变化数量达到了指定的数量就自动执行bgsave命令<br>second:监控的时间范围<br>changes：监控key的变化量
+
+- 重启、关闭服务器
+
+命令 | 说明
+:- | :-
+`debug reload` | 服务器运行过程中重启
+`shutdown save` | 关闭服务器同时保存数据
+
+- RDB模式的优缺点
+	- 优点
+		- RDB是一个紧凑压缩的二进制文件，存储效率高
+		- RDB内部存储的是Redis在某个时间点的数据快照，适合用于数据备份，全量复制等场景
+		- RDB恢复数据的速度要比AOF快
+	- 缺点
+		- RDB方式无论是执行指令还是利用配置，都无法做到实时持久化，具备数据可丢失性
+		- `bgsave`指令每次运行都要创建一个子进程，有性能上的损耗
+		- Redis持久化的文件可能在版本间存在不兼容的情况，需要通过数据库中专解决兼空性问题
+
+## 2. AOF模式（过程）
+
+- AOF开关配置
+
+配置 | 说明
+:- | :-
+`appendonly yes` | 开始AOF持久化模式
+`appendfilename filename` | AOF备份文件名`appendonly-端口号.aof`
+`dir` | 存储目录
+
+- AOF写数据的是哪种策略
+
+配置 | 说明
+:- | :-
+`appendfsync always` | 每次，安全性最高，性能最低
+`appendfsync everysec` | 每秒，默认，安全与性能相对平衡
+`appendfsyc no` | 系统配置，不可控
+
+```
+daemonize yes
+bind 127.0.0.1
+port 6379
+logfile /root/redisData/redis-6379.log
+dir /root/redisData
+dbfilename dump.6379.rdb
+rdbcompression yes
+rdbchecksum yes
+appendonly yes
+appendfilename appendonly.6379.aof
+appendfsync always
+```
+
+- AOF的重写
+
+> 解决重复的冗余指令，系统后帮我们实现
+
+1. 手动重写指令
+
+命令 | 说明
+:- | :-
+`bgrewriteaof` | 手动执行后台重写
+
+2. 自动重写配置
+
+配置 | 说明
+:- | :-
+`auto-aof-rewrite-min size` | 自动重写AOF的最小尺寸，达到了size就重写（对比原有）
+`auto-aof-rewrite-percentage percentage` | 自动重写的百分比（基础尺寸）
+
+> 常用配置，配置后可用info指令查看设置结果
+
+```
+# 代表当前AOF文件空间和上次重写后AOF空间的比值
+auto-aof-rewrite-percentage 100
+# AOP超过10m就开始收缩
+auto-aof-rewrite-min-size 10mb
+```
+
+## 3. RDB vs AOF
+
+持久化方式 | RDB | AOF
+:- | :- | :-
+存储空间 | 小（数据级-压缩）| 大（指令级-重写）
+存储速度 | 慢 | 快
+恢复速度 | 快 | 慢
+数据安全性 | 可能丢失数据 | 依据策略决定
+资源消耗 | 高/重量级 | 低/轻量级
+启动优先级 | 低 | 高
+
+
+# 九、事务处理
+
+## 1. 简介
+
+> Redis事务就是一个命令执行的队列，将一些列的预定义命令包装成一个整体（一个队列），当执行时，一次性按照顺序一次执行，中间不允许被打断或者干扰
+
+## 2. 基本操作
+
+事务执行边界命令
+
+命令 | 说明
+:- | :-
+`multi` | 开启事务
+`exec` | 执行事务
+`discard` | 取消事务的执行
+
+> 在事务处理中，语法错误会报错，正确的则正常执行
+
+## 3. 锁
+
+> 监控数据的变化，根据数据的状态做选择性的操作
+
+命令 | 说明
+:- | :-
+`watch key01 [key02 ...]` | 对指定的key进行监控，在exec之前，如果key发生了变化，终止事务的执行
+`unwatch` | 取消所有对key的监控
+
+> 事务中不能使用watch，会报错
+
+
+## 4. 分布式锁
+
+> 类似于Java中的线程同步锁
+
+命令 | 说明
+:- | :-
+`setnx lock-key val` | 上锁！设置成功返回1，设置失败返回0
+`del key` | 删除锁
+
+> 	为避免死锁，可以通过`expire`为锁添加有效时间
+
+命令 | 说明
+:- | :-
+`expire lock-key second` | 秒为单位
+`pexpire lock-key millseconds` | 毫秒为单位
+
+---
+
+
+# 十、删除策略
+
+## 1. 过期数据
+
+> 通过`ttl`指令查看数据的有效期，-2表示已过期的数据，已被删除的数据，或者是未定义的数据。
+
+## 2. 数据删除策略
+
+> 数据删除策略设计的初衷 - 用于平衡CPU性能
+
+- 定时删除（空优）：创建一个定时器当key设置有过期时间，且过期时间到达，由定时器任务立即执行删除
+	- 优点：节约存储空间
+	- 缺点：CPU性能损耗
+- **惰性删除（时优）**：数据到期时，不做任何处理，下次访问的时候被删除
+	- 优点：节约CPU性能
+	- 缺点：内存空间占用量大
+- **定期删除（平衡）**：定期的对每个库中的key做轮巡访问，随机挑选若干个key，如果过期就删除
+
+## 3. 逐出算法
+
+> 内存不够了，需要淘汰出一部分数据，被淘汰的数据可以从数据库里读回来
+
+- 相关配置
+
+配置 | 说明
+:- | :-
+`maxmemory` | 占用物理内存比例，默认值0，表示不限制，生产环境中需设置，通常为60%左右
+`maxmemory-samples` | 随机获取检测删除数据
+`maxmermory-policy` | 达到最大内存后，对被挑选出来的数据进行删除的策略（逐出算法）
+
+- `maxmemory-policy`配置选项
+	- **检测易失数据**
+		- volatile-lru：最长时间没被使用的数据
+		- volatile-lfu：在一定时间内使用频率最少的数据
+		- volatile-ttl：根据有效期
+		- volatile-random：随机
+	- 检测全库数据
+		- allkeys-lru ...
+		- allkeys-lfu ...
+		- allkeys-random ...
+	- 放弃数据驱逐
+		- no-envication：禁止驱逐，会引发内存溢出Out Of Memory(OOM)
+
+
+# 十一、主从复制
+
+## 1. 简介
+
+> 主从复制就是将一个主服务器的数据，及时有效的共享复制到其他从的服务器中，一个主服务器可以对应多个从服务器，也就是一对多的关系，每个从服务器只对应一个主服务器
+
+工作职责
+- 主
+	- 写数据
+	- 执行写入操作是将出现变化的数据自动同步到各个从服务器
+	- 读取数据（少用）
+- 从
+	- 读取数据
+	- 写数据（禁止）
+
+作用
+- 读写分离
+- 负载均衡
+- 故障恢复
+- 数据冗余（备份）
+- 实现高可用
+
+## 2. 工作流程
+
+- 主从复制过程的三个主要阶段
+	1. 建立连接（从连接主）
+	2. 数据同步（主向从）
+	3. 命令传播（互相发送指令）
+
+### 1) 主从连接方式
+
+> 本质上就是建立主从之间的socket
+
+- 方式一：客户端发送命令
+
+```
+# slaveof <masterip> <masterport>
+
+redis-cli -p 9527  # 登录从服务器
+
+slaveof 127.0.0.1 6379  # 连接主服务器
+```
+
+- 方式二：启动服务器参数
+
+```
+# redis-server --slaveof <masterip> <masterport>
+
+# 启动从服务器的同时，连接主服务器
+redis-server /etc/redis/redis-9527.conf --slaveof 127.0.0.1 6379
+```
+
+- 方式三：服务器配置
+
+配置 | 说明
+:- | :-
+`slaveof <masterip> <masterport>` | 从服务器配置文件添加连接主服务器文件的内容
+
+`slaveof 127.0.0.1 6379`
+
+- 断开连接
+
+命令 | 说明
+:- | :-
+`slaveof no one` | 从服务器执行，断开与主的连接
+
+- 授权访问
+
+	主服务器配置文件设密码
+
+配置 | 说明
+:- | :-
+`requirepass <password>` | 主（master）服务器配置文件中添加密码
+
+	主客户端发送命令设置密码
+
+命令 | 说明
+:- | :-
+`config set requirepass <password>` | 设置密码
+`config get requirepass` | 获取密码
+
+	客户端验证密码
+
+- Shell登录命令`redis-cli -a <password>`连接时验证密码
+- Redis验证命令`auth <password>`连接后验证密码
+- 客户端配置文件中配置`masterauth <password>`通过配置文件中的设置验证密码
+
+### 2) 相关过程说明
+
+- 数据同步：全量数据的复制，底层是RDB的同步。增量（部分复制）复制，是AOF
+	- 复制缓冲区配置`repl-backlog-size 1mb` - 默认1MB，通常设置为主服务器内存的60%左右
+- 命令传播：反复执行命令传播，这个阶段可能会出现断网或其他终断现象
+	- 闪断闪连：忽略
+	- 短时间终断：部分复制
+	- 长时间终断：全部复制
+- 心跳机制：实时保持主从双方在线
+	- 当从服务器多数掉线、延迟高的时候。主服务器为保障数据稳定性，可以拒绝同步操作
+
+配置 | 说明
+:- | :-
+`min-slaves-to write 2` | 从服务器连接数量少于2个，强制关闭主服务器写入功能，停止同步
+`min-slaves-max-lag 10` | 从服务器延迟大于10s，强制关闭主服务器写功能，停止同步
+
+- 释放从服务器
+
+配置 | 说明
+:- | :-
+`repl-timeout 60` | 默认值为60秒，超时则会释放从服务器
+
+- 解决数据不（同步）一致
+
+配置 | 说明
+:- | :-
+`slave-serve-stale-data yes/no` | 慎用，开启后只响应info/slaveof等少数命令
+
+
+
+# 十二、哨兵
+
+## 1. 简介
+
+哨兵（Sentinel）解决主服务器宕机问题，让原主下岗，新主上岗
+
+- 作用
+	- 监控：主从之间是否正常运行
+	- 通知：当被监控的服务器出现问题时，告知其他客户端
+	- 自动故障转移：选择新的主服务器，将其他从连接到新主服务器
+
+
+
+
 
 
 
