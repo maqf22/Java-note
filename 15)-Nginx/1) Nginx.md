@@ -252,6 +252,9 @@ sudo nginx -c /etc/nginx/nginx.conf
 
 # 三、Nginx配置文件说明及Nginx主要应用
 
+> [!TIP]
+> 不同版本存在一定的差异，具体版本请查看网方文档  https://nginx.org
+
 ## 1. Nginx的核心配置文件
 
 > 这个文件位于Nginx的安装目录`/etc/nginx/`目录下，`nginx.conf`
@@ -429,5 +432,214 @@ server {
 
 > Nginx是一个Http的web服务器，可以将服务器上的静态文件（html，图片等）通过http协议返回给浏览器客户端
 
-1. 
+1. 在Liunx家目录中创建myweb目录，用于部署静态网站，创建myNginxConfigure目录，用于存储类中文件
+	`mkdir ~/myWeb ~/myNginxConfigure`
+2. 准备一个网站项目或者网页，用于测试
+3. 将准备好的网站打包存放到`~/myweb`目录中
+4. 修改`nginx.conf`配置文件
+	- 拷贝两个配置文件到当前用户家目录中创建`myNginxConfigure`配置文件存放目录
+		`sudo cp /etc/nginx/conf.d/default.conf /etc/nginx/nginx.conf ~/myNginxConfigure`
+	- 进入`myNginxConfigure`目录，并使用Windows资源管理器打开目录，方便下一步编辑配置文件
+		`cd ~/myNginxConfigure`
+		`explorer.exe`
+5. 修改`8090-server.conf`配置文件
+```
+listen 8090;
+
+location /www {
+	alias /home/maqf/www
+	index index.html
+}
+```
+6. 修改nginx.conf配置文件
+```
+include /home/maqf/myNginxConfigure/8090-server.conf;
+```
+7. 重启Nginx服务器
+	`nginx -s reload`
+8. 在浏览器中输入`localhost:8090/www`进行测试
+
+
+# 五、负载均衡
+
+## 1. 概述
+
+负载均衡（Load Balancing）是一种计算机网络技术， 用来在多个计算机（计算机集群）、网络连接、CPU、磁盘驱动器或其他资源中分配负载， 以达到最佳化资源使用、最大化吞吐率、最小化响应时间、同时避免过载的目的。  
+使用带有负载均衡的多个服务器组件，取代单一的组件，可以通过冗余提高可靠性。  
+负载均衡服务通常是由专用软体和硬件来完成。
+
+## 2. 负载均衡实现方式
+
+### 1) 硬件负载均衡
+
+- 比如F5、深信服、Array等
+	- 优点是有厂商专业的技术服务团队提供支持，性能稳定
+	- 缺点是费用昂贵，对于规模较小的网络应用成本太高
+
+### 2) 软件负载均衡
+
+比如Nginx、LVS、HAProxy等
+- 优点是免费开源，成本低谦
+
+### 3) Nginx负载均衡
+
+> Nginx通过在`nginx.conf`文件进行配置即可实现负载均衡
+
+原理图
+![[Pasted image 20230620112541.png]]
+
+#### 实现步骤
+
+ ##### a. 在Liunx中安装Tomcat
+
+1. 命令行输入`sudo apt install openjdk-8-jdk`安装JDK
+
+2. 配置环境变量`vi /etc/profile`
+```
+export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+export JRE_HOME=${JAVA_HOME}/jre
+export CLASSPATH=.:${JAVA_HOME}/lib:${JRE_HOME}/lib
+export PATH=.:${JAVA_HOME}/bin:${PATH}
+```
+
+3. 激活配置文件使其永久生效
+```
+sudo source /etc/profile # 激活主配置文件（不用重启）
+sudo source ~/.bashrc # 激活当前用户的bash配置文件
+```
+
+4. 命令行输入`sudo apt install tomcat9 tomcat9-docs tomcat9-examples tomcat9-admin`安装Tomcat9
+
+5. 调整相关的配置
+	1. 安装目录上创建`conf`和`logs`目录，`mkdir /usr/share/tomcat9/conf /usr/share/tomcat9/conf` 
+	2. 复制配置文件到指定目录`cp /usr/share/tomcat9/etc/* /usr/share/tomcat9/conf/`
+	3. 修改`/usr/share/tomcat9/conf/server.xml`配置文件
+		1. 修改连接服务接端口&连接端口号
+		```
+		<Server port="-1" shutdown="SHUTDOWN">
+		<Connector port="8099" 
+			protocol="HTTP/1.1" 
+			connectionTimeout="20000" 
+			redirectPort="8443" />
+		```
+		2. 修改网站家目录位置
+		```
+		<Host name="localhost" 
+			appBase="/var/lib/tomcat9/webapps" 
+			unpackWARs="true" autoDeploy="true">
+		```
+
+ 6. Tomcat相关命令
+```
+sudo sh /usr/share/tomcat9/bin/startup.sh
+sudo sh /usr/share/tomcat9/bin/shutdown.sh
+```
+
+7. Windows相关命令
+	`由于使用的是Windows中的子系统Ubuntu，所以查看端口号的占用情况需要使用Windows的命令行终端cmd`
+- 查看端口号的占用情况，最后一列是进程ID，也就是pid
+```
+# 查看指定的端口号占用情况
+netstat -aon | findstr "8090"
+```
+- 查看占用端口号的进程名
+```
+# 查看指定进程
+tasklist | findsstr "16508"
+```
+- 结束进程，可通过Windows中的任务管理结束对应PID的进程
+
+
+##### b. 源码包形式安装Nginx
+
+> 之前通过apt安装的nginx对于ubuntu子系统的兼容有冲突
+
+1. 安装gcc/g++的依赖库
+```
+sudo apt install build-essential
+sudo apt install libtool
+```
+
+2. 安装pcre依赖库
+```
+sudo apt update
+sudo apt install libpcre3 libpcre3-dev
+```
+
+3. 安装zlib依赖库
+```
+sudo apt install zliblg-dev
+```
+
+4. 安装ssl依赖库
+```
+sudo apt install openssl
+```
+
+5. 下载，解压并进入到源码包目录
+```
+tar axvf nginx-x.xx.x.tar.gz
+cd ~nginx-x.xx.x
+```
+
+6. 配置、编译、执行安装
+```
+./configure
+make
+sudo make install
+```
+
+7. 通过可执行文件启动nginx
+![[Pasted image 20230620170209.png]]
+
+##### c. 在Linux服务器`/usr/share`目录下，拷贝两台新tomcat
+
+```
+sudo cp /usr/share/tomcat9 /usr/share/tomcat9-8081 -r
+sudo cp /usr/share/tomcat9 /usr/share/tomcat9-8082 -r
+```
+
+##### d. 将这两台tomcat服务器webapps目录下没用的项目删掉
+
+##### e. 分别修改两个拷贝出来的端口号为8081和8082，并将其他端口号升序加1即可，并制定webapps网站家目录
+
+```
+# 端口号修改
+69     <Connector port="8081" protocol="HTTP/1.1"
+70                connectionTimeout="20000"
+71                redirectPort="8444" />
+
+# appBase修还原
+152       <Host name="localhost"  appBase="webapps"
+153             unpackWARs="true" autoDeploy="true">
+
+# 在<host>标签的最后一行添加
+167       <Context path="" docBase="/usr/share/tomcat9-8081/webapps" debug="0" />
+
+======
+#8082同理
+```
+
+##### f. 分别在两个webapps目中添加index.html页面文件，内容做好区分，以便测试
+
+```html
+<!-- /usr/share/tomcat9-8081/webapps/index.html -->
+<h1>Hello Tomcat port 8081</h1>
+
+======
+<!-- 8082同埋 -->
+```
+
+##### g. 分别启动两台tomcat，并查看服务启动状态
+
+```
+sudo sh /usr/share/tomcat9-8081/bin/startup.sh
+sudo sh /usr/share/tomcat9-8082/bin/startup.sh
+```
+
+##### h. 浏览器直接访问两台tomcat，进行测试
+
+> 但我们网站一般对外之后提供一个入口地址，所以这个时候可以使用nginx进负载。
+
+##### i. 配置nginx
 
