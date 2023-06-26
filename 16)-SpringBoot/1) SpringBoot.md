@@ -501,3 +501,678 @@ class SpringBoot06JspApplicationTests {
 
 ## 1. MyBatis整合步骤
 
+1. 创建SpringBoot工程
+
+2. 引入MyBatis起步依赖并添加MySQL驱动
+![[Pasted image 20230626095015.png]]
+
+3. 编写DataSource与MyBatis相关配置信息（resources > application.yml）
+```xml
+# DataSource Configure  
+spring:  
+  datasource:  
+    #url: jdbc:mysql:///spring_data?useUnicode=true&characterEncoding=utf8&useSSL=false  
+    url: jdbc:mysql://127.0.0.1:3306/spring_data?useUnicode=true&characterEncoding=utf8&useSSL=false  
+    driver-class-name: com.mysql.cj.jdbc.Driver  
+    username: root  
+    password: root
+
+mybatis:  
+  # config-location：用于指定MyBatis核心配置文件  
+  mapper-locations: classpath:mapper/*Mapper.xml  
+  type=aliases-package: com.example.domain
+```
+
+4. 创建表、定义实体类
+- `Stu`数据表备份
+```sql
+set foreign_key_checks=0;
+
+drop table if exists `stu`;
+create table `stu` (
+	`id` int(10) unsigned not null auto_increment,
+	`name` varchar(32) not null,
+	`sex` enum('0', '1', '2') default '0',
+	`age` tinyint(3) unsigned default '18',
+	`score` float(6,2) default '0.00',
+	`tel` varchar(32) not null,
+	`classid` varchar(16) default 'SpringBoot',
+	primary key(`id`),
+	unique key `tel` (`tel`)
+)engine=MyISAM auto_increment=1 default charset=utf8;
+
+insert into `stu` values
+('1', 'Andy', '1', '19', '100.00', '12345678901', 'JavaSE'),
+...;
+```
+- `Stu.java`实体类
+```java
+package com.example.domain;
+
+public class Stu {
+    private int id;
+    private String name;
+    private String sex;
+    private Integer age;
+    private Float score;
+    private String tel;
+
+    public Stu() {
+    }
+
+    public Stu(String name, String sex, Integer age, Float score, String tel) {
+        this.name = name;
+        this.sex = sex;
+        this.age = age;
+        this.score = score;
+        this.tel = tel;
+    }
+
+    public Stu(int id, String name, String sex, Integer age, Float score, String tel) {
+        this.id = id;
+        this.name = name;
+        this.sex = sex;
+        this.age = age;
+        this.score = score;
+        this.tel = tel;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getSex() {
+        return sex;
+    }
+
+    public void setSex(String sex) {
+        this.sex = sex;
+    }
+
+    public Integer getAge() {
+        return age;
+    }
+
+    public void setAge(Integer age) {
+        this.age = age;
+    }
+
+    public Float getScore() {
+        return score;
+    }
+
+    public void setScore(Float score) {
+        this.score = score;
+    }
+
+    public String getTel() {
+        return tel;
+    }
+
+    public void setTel(String tel) {
+        this.tel = tel;
+    }
+
+    @Override
+    public String toString() {
+        return "Stu{" +
+                "id=" + id +
+                ", name='" + name + '\'' +
+                ", sex='" + sex + '\'' +
+                ", age=" + age +
+                ", score=" + score +
+                ", tel='" + tel + '\'' +
+                '}';
+    }
+}
+```
+
+5. 编写dao与mapper文件/纯注解开发
+- 注解
+- `StuMapper.java`
+```java
+package com.example.mapper;  
+  
+import com.example.domain.Stu;  
+import org.apache.ibatis.annotations.Mapper;  
+import org.apache.ibatis.annotations.Select;  
+  
+import java.util.List;  
+  
+@Mapper  
+public interface StuMapper {  
+    @Select("select * from `stu`")  
+    List<Stu> findAll();  
+}
+```
+
+- xml
+- `resources/mapper/StuMapper.xml`
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.mapper.StuXmlMapper">
+	<select id="findAll" resultType="Stu">
+		select * from stu
+	</select>
+</mapper>
+```
+- `StuXmlMapper.java`
+```java
+package com.example.mapper;  
+  
+import com.example.domain.Stu;  
+import org.apache.ibatis.annotations.Mapper;  
+import org.springframework.stereotype.Repository; 
+  
+import java.util.List;  
+  
+@Mapper
+@Repository
+public interface StuXmlMapper {   
+    List<Stu> findAll();  
+}
+```
+
+6. `pom.xml`中添加
+```xml
+<resources>
+	<resource>
+		<directory>src/main/java</directory>
+		<includes>
+			<include>**/*.xml</include>
+		</includes>
+		<filtering>false</filtering>
+	</resource>
+</resources>
+```
+
+8. 测试
+```java
+package com.example;
+
+import com.example.domain.Stu;
+import com.example.mapper.StuMapper;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import java.util.List;
+
+@SpringBootTest
+class SpringBoot07MyBatisApplicationTests {
+    @Autowired
+    private StuMapper stuMapper;
+    @Test
+    void findAllTest() {
+        List<Stu> stuList = stuMapper.findAll();
+        for (Stu stu : stuList) {
+            System.out.println(stu);
+        }
+    }
+}
+```
+
+## 2. MyBatis结合逆向工程
+
+1. 创建SpringBoot模块
+
+2. 选择MyBatis起步依赖，MySQL驱动
+
+3. 编写application.properties配置文件
+```properties
+# 设置端口号
+server.port=8081
+
+# 数据库连接设置
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+spring.datasource.url=jdbc:mysql://127.0.0.1:3306/spring_data?useUnicode=true&characterEncoding=utf8&useSSL=false
+spring.datasource.username=root
+spring.datasource.password=root
+```
+
+4. `pom.xml`中添加坐标支持
+```xml
+<!-- mybatis逆向工程依赖2个 -->
+<dependency>
+	<groupId>org.mybatis.generator</groupId>
+	<artifactId>mybatis-generator-core</artifactId>
+	<version>1.3.7</version>
+</dependency>
+<dependency>
+	<groupId>org.mybatis.generator</groupId>
+	<artifactId>mybatis-generator-maven-plugin</artifactId>
+	<version>1.3.7</version>
+</dependency>
+```
+
+5. `pom.xml`中添加插件支持
+```xml
+<plugin>
+	<groupId>org.mybatis.generator</groupId>
+	<artifactId>mybatis-generator-maven-plugin</artifactId>
+	<version>1.3.6<version>
+	<configuration>
+		<!-- 配置文件的位置 -->
+		<configurationFile>GeneratorConfig.xml</configurationFile>
+		<verbose>true</verbose>
+		<overwrite>true</overwrite>
+	</configuration>
+</plugin>
+```
+
+6. 添加反向工程配置文件`GeneratorConfig.xml`
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE generatorConfiguration PUBLIC "-//mybatis.org//DTD MyBatis Generator Configuration 1.0//EN" "http://mybatis.org/dtd/mybatis-generator-config_1._0.dtd">
+
+<generatorConfiguration>
+
+	<!-- 指定连接数据库的JDBC驱动包所在位置，指定到你本机的完整路径 -->
+	<classPathEntry location="D:\Program Files\Java\repository\mysql\mysql-connector-java\5.1.47\mysql-connector-java-5.1.47.jar"/>
+
+	<!-- 配置table表信息内容体，targetRuntime指定采用MyBatis3的版本 -->
+	<context id="tables" targetRuntime="MyBatis3">
+
+		<!-- 抑制生成注释，由于生成的注释都是英文的，可以不让它生成 -->
+		<commentGenerator>
+			<property name="suppressAllComments" value="true" />
+		</commentGenerator>
+		
+		<!-- 配置数据库连接信息 -->
+		<jdbcConnection driverClass="com.mysql.jdbc.Driver"
+						connectionURL="jdbc:mysql://127.0.0.1:3306/spring_data?useSSL=false"
+						userId="root"
+						password="root">
+		</jdbcConnection>
+
+		<!-- 生成model类，targetPackage指定model类的包名，targetProject指定生成的model放在eclipse的哪个工程下面 -->
+		<javaModelGenerator targetPackage="com.example.model" targetProject="src/main/java">
+			<property name="enableSubPackages" value="false" />
+			<property name="trimStrings" value="false" />
+		</javaModelGenerator>
+
+		<!-- 生成MyBatis的Mapper.xml文件，targetPackage指定mapper.xml文件的包名，targetProject指定生成的mapper.xml放在eclipse的哪个工程下面 -->
+		<sqlMapGenerator targetPackage="com.example.mapper" targetProject="src/main/java">
+			<property name="enableSubPackages" value="false" />
+		</sqlMapGenerator>
+
+		<!-- 生成MyBatis的Mapper接口类文件，targetPackage指定Mapper接口类的包名，targetProject指定生成的Mapper接口放在eclipse在哪个工程下面 -->
+		<javaClientGenerator type="XMLMAPPER" targetPackage="com.example.mapper" targetProject="src/main/java">
+			<property name="enableSubPackages" value="false" />
+		</javaClientGenerator>
+
+		<!-- 数据库表名及对应的Java模型类名 -->
+		<table tableName="stu"
+				domainObjectName="Stu"
+				enableCountByExample="false"
+				enableUpdateByExample="false"
+				enableDeleteByExample="false"
+				enableSelectByExample="false"
+				selectByExampleQueryId="false" />
+				
+	</context>
+
+</generatorConfiguration>
+```
+
+7. 使用插件生成所需必要文件（双击运行mybatis-generator:generate）
+![[Pasted image 20230626115559.png]]
+生成结果：
+![[Pasted image 20230626120823.png]]
+
+8. 编写测试代码
+
+> `StuMapper.java` 注意：在接口顶部添加`@Mapper`注解，将当前接口声明为Mapper接口
+
+```java
+// 添加注解并定义抽象方法备用
+@Select("select * from stu")
+List<Stu> findAll();
+```
+
+> `StuService.java`
+
+```java
+package com.example.service;  
+  
+import com.example.domain.Stu;  
+  
+import java.util.List;  
+  
+public interface StuMapper {  
+    List<Stu> findAll();
+    Stu findById(int id);
+}
+```
+
+> `StuServiceImpl.java`
+
+```java
+@Service
+public class StuServiceIpml implements StuService {
+	@Resource
+	private StuMapper stuMapper;
+	@Override
+	public List<Stu> findAll() {
+		return stuMapper.findAll();
+	}
+	@Override
+	public Stu findById(int id) {
+		System.out.println("IMPL findById is running...");
+		return stuMapper.selectByPrimaryKey(id);
+	}
+}
+```
+
+9. 告知映射xml文件所在位置，在pom.xml的`<build>...</build>`标签下添加
+```xml
+<resources>
+	<!-- 通知Maven编译SQL映射文件，是否Maven是不会编译SQL映射文件的 -->
+	<resource>
+		<directory>src/main/java</directory>
+		<includes>
+			<include>**/*.xml</include>
+		</includes>
+	</resource>
+</resources>
+```
+
+10. 测试
+	1. `http://localhost:8081/findById?id=1`
+	2. `http://localhost:8081/findAll`
+
+## 3. MyBatis事务支持
+
+> 步骤
+
+1. 创建SpringBoot模块
+
+2. 选择起步依赖：lombok / MyBatis / web / MySQL Driver
+
+3. 创建数据表与实体类
+- `user表`
+```sql
+create table `user` (
+	`id` int(10) unsigned not null auto_imcrement,
+	`username` varchar(16) not null,
+	`password` varchar(32) not null,
+	`status` enum('0', '1', '2') default '2',
+	primary key (`id`),
+	unique key `username` (`username`)
+) engine=InnoDB default charset=utf8;
+```
+- `com.example.domain.User 实体类`
+```java
+package com.example.domain;  
+  
+import lombok.Data;  
+  
+@Data  
+public class User {  
+    private int id;  
+    private String username;  
+    private String password;  
+    private String status;  
+}
+```
+
+4. 编写application配置文件
+- `application.properties`
+```properties
+# 配置端口号  
+server.port=8081  
+  
+# 数据库连接池配置  
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver  
+spring.datasource.url=jdbc:mysql://127.0.0.1:3306/spring_data?useUnicode=true&characterEncoding=utf8&useSSL=false  
+spring.datasource.username=root  
+spring.datasource.password=root
+```
+
+5. 编写程序代码
+- `com.example.mapper.UserMapper`
+```java
+package com.example.mapper;  
+  
+import com.example.domain.User;  
+import org.apache.ibatis.annotations.Insert;  
+import org.apache.ibatis.annotations.Mapper;  
+import org.apache.ibatis.annotations.Select;  
+  
+import java.util.List;  
+  
+@Mapper  
+public interface UserMapper {  
+    @Select("select * from `user`")  
+    List<User> findAll();  
+  
+    @Insert("insert into `user` (`username`, `password`, `status`) values (#{username}, #{password}, #{status})")  
+    void insert(User user);  
+}
+```
+
+- `com.example.service.UserService`
+```java
+package com.example.service;  
+  
+import com.example.domain.User;  
+  
+import java.util.List;  
+  
+public interface UserService {  
+    List<User> findAll();  
+    void add(User user);  
+}
+```
+- `com.example.service.impl.UserServiceImpl`
+```java
+package com.example.service.impl;  
+  
+import com.example.domain.User;  
+import com.example.mapper.UserMapper;  
+import com.example.service.UserService;  
+import org.springframework.stereotype.Service;  
+import org.springframework.transaction.annotation.Transactional;  
+  
+import javax.annotation.Resource;  
+import java.util.List;  
+  
+@Service  
+public class UserServiceImpl implements UserService {  
+    @Resource  
+    private UserMapper userMapper;  
+    @Override  
+    public List<User> findAll() {  
+        return userMapper.findAll();  
+    }  
+  
+    @Override  
+    @Transactional // 事务注解
+    public void add(User user) {  
+        System.out.println("add() is running...");  
+        userMapper.insert(user);  
+        // System.out.println(10 / 0); // 制造一个异常
+        user.setUsername(user.getUsername() + "New");  
+        userMapper.insert(user);  
+    }  
+}
+```
+
+- `com.example.controller.UserController`
+```java
+package com.example.controller;  
+  
+import com.example.domain.User;  
+import com.example.service.UserService;  
+import org.springframework.stereotype.Controller;  
+import org.springframework.web.bind.annotation.RequestMapping;  
+import org.springframework.web.bind.annotation.ResponseBody;  
+import org.springframework.web.bind.annotation.RestController;  
+  
+import javax.annotation.Resource;  
+import java.util.List;  
+  
+// @Controller 
+// @ResponseBody  
+@RestController // @RestController = @Controller + @ResponseBody  
+public class UserController {  
+    @Resource  
+    private UserService userService;  
+  
+    @RequestMapping("/findAll")  
+    // @ResponseBody  
+    public List<User> findAll() {  
+        return userService.findAll();  
+    }  
+  
+    @RequestMapping("/add")  
+    // @ResponseBody  
+    public String add(User user) {  
+        userService.add(user);  
+        return "添加成功";  
+    }  
+}
+```
+
+6. 测试
+> `http://localhost:8081/findAll`
+> `http://localhost:8081/add?username=Ben&password=333333&status=2`
+
+> [!注意]
+> `1. 如果一个业力操作中有一个以上的数据更新操作，就要开始事务`
+> `2. 使用事务的数据包格式必须是InnoDB格式`
+
+## 4. MyBatis-Plus整合步骤
+
+1. 创建SpringBoot项目
+
+2. 添加MySQL驱动
+
+3. 手动引入依赖
+```xml
+<dependency>  
+    <groupId>com.baomidou</groupId>  
+    <artifactId>mybatis-plus-boot-starter</artifactId>  
+    <version>3.5.3.1</version>  
+</dependency>  
+<dependency>  
+    <groupId>org.projectlombok</groupId>  
+    <artifactId>lombok</artifactId>  
+</dependency>
+```
+
+4. 创建数据表与实体类
+- `数据表略`
+- `Stu.java实体类`
+```java
+package com.example.domain;  
+  
+import lombok.Data;  
+  
+@Data  
+public class Stu {  
+    private int id;  
+    private String name;  
+    private String sex;  
+    private int age;  
+    private double score;  
+    private String tel;  
+    private String classId;  
+}
+```
+
+6. 编写`application`配置文件
+```xml
+spring:  
+  datasource:  
+    driver-class-name: com.mysql.cj.jdbc.Driver  
+    url: jdbc:mysql:///spring_data?useUnicode=true&characterEncoding=utf8&useSSL=false  
+    username: root  
+    password: root  
+  
+mybatis-plus:  
+  configuration:  
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl # 开启SQL日志  
+    map-underscore-to-camel-case: true # 该配置就是将带有下划的表字段映射为驼峰格式的实体类属性  
+  mapper-locations: classpath:mapper/*Mapper.xml  
+  type-aliases=package: com.example.domain
+```
+
+6. 编写dao或mapper/纯注解开发
+- `com.example.mapper.StuMapper.java`
+```java
+package com.example.mapper;  
+  
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;  
+import com.example.domain.Stu;  
+import org.apache.ibatis.annotations.Mapper;  
+
+// MyBatisPlus默认会将实体类属性的驼峰名转化为下划线去组织SQL语句
+@Mapper  
+public interface StuMapper extends BaseMapper<Stu> {
+}
+```
+
+- `com.example.service.StuServiceImpl.java`
+```java
+package com.example.service;  
+  
+import com.example.domain.Stu;  
+import com.example.mapper.StuMapper;  
+import org.springframework.stereotype.Service;  
+  
+import javax.annotation.Resource;  
+import java.util.List;  
+  
+@Service  
+public class StuServiceImpl {  
+    @Resource(name="stuMapper")  
+    private StuMapper stuMapper;  
+    public List<Stu> findAll() {  
+        return stuMapper.selectList(null);  
+    }  
+}
+```
+
+7. 编写测试
+
+```java
+package com.example;  
+  
+import com.example.domain.Stu;  
+import com.example.service.StuServiceImpl;  
+import org.junit.jupiter.api.Test;  
+import org.springframework.beans.factory.annotation.Autowired;  
+import org.springframework.boot.test.context.SpringBootTest;  
+  
+import java.util.List;  
+  
+@SpringBootTest  
+class SpringBoot09MyBatisPlusApplicationTests {  
+    @Autowired  
+    private StuServiceImpl stuService;  
+  
+    @Test  
+    void finAllTest() {  
+        List<Stu> stuList = stuService.findAll();
+        for (Stu stu : stuList) {  
+            System.out.println(stu);  
+        }  
+    }  
+}
+```
+
+
