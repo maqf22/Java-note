@@ -1108,7 +1108,7 @@ mybatis-plus:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl # 开启SQL日志  
     map-underscore-to-camel-case: true # 该配置就是将带有下划的表字段映射为驼峰格式的实体类属性  
   mapper-locations: classpath:mapper/*Mapper.xml  
-  type-aliases=package: com.example.domain
+  type-aliases-package: com.example.domain
 ```
 
 6. 编写dao或mapper/纯注解开发
@@ -1174,5 +1174,313 @@ class SpringBoot09MyBatisPlusApplicationTests {
     }  
 }
 ```
+
+
+# 八、SpringBoot中的Web
+
+## 1. 常用注解
+
+注解 | 说明
+:- | :- 
+`@Controller` | Spring MVC的注解，处理http请求
+`@RestController` | 是`@Controller`注解功能的增强，是`@Controller`和`@ResponseBody`的组合注解
+`@RequestMapping` | 支持Get请求，也支持Post请求
+`@GetMapping` | Get请求，多用于查询
+`@PostMapping` | Post请求，多用于添加
+`@PutMapping` | 本质上是Post请求，多用于修改
+`@DeleteMapping` | 本质上是Post请求，多用于删除
+
+- `com.example.controller.TestController.java`
+```java
+package com.example.controller;
+
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+public class TestController {
+    @RequestMapping("/request")
+    public String request() {
+        return "request~";
+    }
+
+    @GetMapping("/get")
+    public String get() {
+        return "get~";
+    }
+
+    @PostMapping("/post")
+    public String post() {
+        return "post~";
+    }
+
+    @PutMapping("/put")
+    public String put() {
+        return "put~";
+    }
+
+    @DeleteMapping("/delete")
+    public String delete() {
+        return "delete~";
+    }
+}
+```
+
+- `static/index.html`
+```html
+<!DOCTYPE html>  
+<html lang="en">  
+<head>  
+    <meta charset="UTF-8">  
+    <title>Test</title>  
+</head>  
+<body>  
+	<form action="/request">  
+	    <button>request</button>  
+	</form>  
+	<hr/>  
+	<form action="/get" method="get">  
+	    <button>get</button>  
+	</form>  
+	<hr/>  
+	<form action="/post" method="post">  
+	    <button>post</button>  
+	</form>  
+	<hr/>  
+	<form action="/put" method="post">  
+	    <input type="hidden" name="_method" value="put"/>  
+	    <button>put</button>  
+	</form>  
+	<hr/>  
+	<form action="/delete" method="post">  
+	    <input type="hidden" name="_method" value="delete"/>  
+	    <button>delete</button>  
+	</form>  
+</body>  
+</html>
+```
+
+- `application.properties`
+```properties
+spring.mvc.hiddenmethod.filter.enabled=true # 开启隐藏域的过滤  
+```
+
+## 2. SpringBoot实现RESTFul
+
+> 常规地址访问风格：`http://localhost:8080/lesson?price=1299&days=150`
+> RESEFul风格：`http://localhost:8080/lesson/1299/150`
+
+### 案例
+
+- `TestController.java`
+```java
+@RequestMapping("/restful/{teacher}/{lesson}")  
+public String restful(@PathVariable String teacher, @PathVariable String lesson) {  
+    return "teacher=" + teacher + "<br/>" + "lesson=" + lesson;  
+}
+```
+
+- `index.html`
+```html
+<form action="/restful/Jack/SpringBoot">  
+    <button>restful</button>  
+</form>
+```
+
+> [!注意]
+> `1.使用RESTFul风格后，不能将参数直接传递到对象中`
+> `2.{}中的部分为动态参数，请求时必须填写`
+> `3.使用RESTFul风格是，容易出现冲突，比如：/restful/Jack/JavaSE和/restful/JavaSE/Jack`
+> `4.如果形参名与动态数名不一致，需要在@PathVariable("动态参数名")矫正动态参数名`
+
+
+# 九、SpringBoot整合Redis
+
+## 1. 整合步骤
+
+1. 新建SpringBoot工程
+![[Pasted image 20230627155105.png]]
+2. 引入起步依赖
+3. 配置Redis相关属性
+```properties
+spring.redis.host=127.0.0.1  
+spring.redis.port=6379
+```
+4. 注入RedisTemplate模板并测试
+```java
+package com.example;  
+  
+import org.junit.jupiter.api.Test;  
+import org.springframework.beans.factory.annotation.Autowired;  
+import org.springframework.boot.test.context.SpringBootTest;  
+import org.springframework.data.redis.core.RedisTemplate;  
+import org.springframework.data.redis.core.StringRedisTemplate;  
+  
+@SpringBootTest  
+class SpringBoot11RedisApplicationTests {  
+    @Autowired  
+    private RedisTemplate<String, String> redisTemplate;  
+    @Autowired  
+    private StringRedisTemplate stringRedisTemplate;  
+  
+    @Test  
+    void teacherWriteAndRead() {  
+        redisTemplate.boundValueOps("teacher").set("MrTom");  
+        // String teacher = redisTemplate.boundValueOps("teacher").get();  
+        String teacher = redisTemplate.boundValueOps("teacher").get(0, -1);  
+        System.out.println(teacher);  
+    }  
+  
+    @Test  
+    void studentWriteAndRead() {  
+        stringRedisTemplate.boundValueOps("student").set("Lily");  
+        String student = stringRedisTemplate.boundValueOps("student").get();  
+        System.out.println(student);  
+    }  
+}
+```
+
+## 2. RedisTemplate常用方法
+
+https://juejin.cn/post/7096347622759202853
+
+## 3. Redis or MySQL
+
+1. 创建SpringBoot项目，并添加起步依赖（Lombok / SpringWeb / MySQL Driver / Spring Data Redis (Access + Driver)）
+2. `pom.xml`中添加`MyBatisPlus`启动依赖
+```xml
+<dependency>  
+    <groupId>com.baomidou</groupId>  
+    <artifactId>mybatis-plus-boot-starter</artifactId>  
+    <version>3.5.3.1</version>  
+</dependency>
+```
+3. `application.properties`中添加对应的Redist、Datasource和MybatisPlus配置
+```properties
+server.port=8081  
+# Redis  
+spring.redis.host=127.0.0.1  
+spring.redis.port=6379  
+# datasource  
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver  
+spring.datasource.url=jdbc:mysql://127.0.0.1:3306/spring_data?useUniCode=true&characterEncoding=utf8&useSSL=false  
+spring.datasource.username=root  
+spring.datasource.password=root  
+# Mybatis plus  
+mybatis-plus.configuration.log-impl=org.apache.ibatis.logging.stdout.StdOutImpl  
+mybatis-plus.configuration.map-underscore-to-camel-case=true  
+mybatis-plus.mapper-locations=classpath:mapper/*Mapper.xml  
+mybatis-plus.type-aliases-package=com.example.domain
+```
+4. 创建`com.example.domain.User.java`实体类
+```java
+package com.example.domain;  
+  
+import lombok.AllArgsConstructor;  
+import lombok.Data;  
+import lombok.ToString;  
+  
+import java.io.Serializable;  
+  
+@Data  
+@AllArgsConstructor  
+@ToString  
+public class User implements Serializable { // 记得实现一下序列化接口Serializable
+    private Integer id;  
+    private String username;  
+    private String password;  
+    private String status;  
+}
+```
+5. 创建 Service
+- `com.example.service.UserService.java`
+```java
+package com.example.service;  
+  
+import com.example.domain.User;  
+  
+import java.util.List;  
+  
+public interface UserService {  
+    List<User> findAll();  
+}
+```
+- `com.example.service.impl.UserServiceImpl.java`
+```java
+package com.example.service.impl;  
+  
+import com.example.domain.User;  
+import com.example.mapper.UserMapper;  
+import com.example.service.UserService;  
+import org.springframework.data.redis.core.RedisTemplate;  
+import org.springframework.data.redis.serializer.StringRedisSerializer;  
+import org.springframework.stereotype.Service;  
+  
+import javax.annotation.Resource;  
+import java.util.List;  
+  
+@Service  
+public class UserServiceImpl implements UserService {  
+    @Resource  
+    private RedisTemplate<String, List<User>> redisTemplate;  
+  
+    // 定义Redis的数据格式对象（确定序列化方式）  
+    private final StringRedisSerializer stringRedisSerializer = new StringRedisSerializer();  
+  
+    @Resource  
+    private UserMapper userMapper;  
+  
+    @Override  
+    public List<User> findAll() {  
+        // 设置key的序列化类型为String类型  
+        redisTemplate.setKeySerializer(stringRedisSerializer);  
+        // 在Redis中获取数据  
+        List<User> usersAll = redisTemplate.opsForValue().get("usersAll");  
+        // 如果在Redis中没有获取到数据，则从MySQL中获取并写入Redis中  
+        if (null == usersAll) {  
+            // 同步语句块，以防Redis中没数据时多人同时并发去MySQL中读取（防止缓存击穿）  
+            synchronized (this) {  
+	            // 重新在Redis中获取
+                usersAll = redisTemplate.opsForValue().get("usersAll");   
+                if (null == usersAll) { // 重新判断是否在Redis中拿到  
+                    System.out.println("从MySQL中获取并写入Redis");  
+                    usersAll = userMapper.selectList(null);  
+                    redisTemplate.opsForValue().set("usersAll", usersAll);  
+                }  
+            }  
+        }  
+        return usersAll;  
+    }  
+}
+```
+6. 创建Controller
+- `com.example.controller.UserController.java`
+```java
+package com.example.controller;  
+  
+import com.example.domain.User;  
+import com.example.service.impl.UserServiceImpl;  
+import org.springframework.web.bind.annotation.RequestMapping;  
+import org.springframework.web.bind.annotation.RestController;  
+  
+import javax.annotation.Resource;  
+import java.util.List;  
+  
+@RestController  
+public class UserController {  
+    @Resource  
+    private UserServiceImpl userServiceImpl;  
+  
+    @RequestMapping("/findAll")  
+    public List<User> findAll() {  
+        return userServiceImpl.findAll();  
+    }  
+}
+```
+7. 测试
+`http://localhost:8081/findAll`
+
+## 4. 集群设置
+
+
 
 
