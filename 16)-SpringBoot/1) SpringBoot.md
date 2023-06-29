@@ -1481,6 +1481,348 @@ public class UserController {
 
 ## 4. 集群设置
 
+1. 搭建集群环境
+- `redis-9527` - 主配置文件
+```shell
+include /etc/redis/redis.conf
+daemonize yes
+port 9527
+pidfile /var/run/redis-9527.pid
+logfile /home/maqf/myRedisData/redis-9527.log
+dir /home/maqf/myRedisData
+requirepass maqf
+masterauth maqf
+protected-mode no
+```
+- `redis-9528 - 从配置文件
+```shell
+include /etc/redis/redis.conf
+daemonize yes
+port 9528
+pidfile /var/run/redis-9528.pid
+logfile /home/maqf/myRedisData/redis-9528.log
+dir /home/maqf/myRedisData
+requirepass maqf
+masterauth maqf
+protected-mode no
+slaveof 127.0.0.1 9527
+```
+- `redis-9529 - 从配置文件
+```shell
+include /etc/redis/redis.conf
+daemonize yes
+port 9529
+pidfile /var/run/redis-9529.pid
+logfile /home/maqf/myRedisData/redis-9529.log
+dir /home/maqf/myRedisData
+requirepass maqf
+masterauth maqf
+protected-mode no
+slaveof 127.0.0.1 9527
+```
 
+- `sentinel-9527.conf` - 哨兵配置文件
+```shell
+# bind 127.0.0.1 :: 1 # 注释掉
+protected-mode no
+port 29527
+sentinel monitor mymaster 127.0.0.1 9527 2
+sentinel auth-pass mymaster maqf
+```
+- `sentinel-9528.conf` - 哨兵配置文件
+```shell
+# bind 127.0.0.1 :: 1 # 注释掉
+protected-mode no
+port 29528
+sentinel monitor mymaster 127.0.0.1 9527 2
+sentinel auth-pass mymaster maqf
+```
+- `sentinel-9529.conf` - 哨兵配置文件
+```shell
+# bind 127.0.0.1 :: 1 # 注释掉
+protected-mode no
+port 29529
+sentinel monitor mymaster 127.0.0.1 9527 2
+sentinel auth-pass mymaster maqf
+```
+
+2. 启动集群
+```bash
+sudo redis-server redis-9527.conf
+sudo redis-server redis-9528.conf
+sudo redis-server redis-9529.conf
+sudo redis-server sentinel-9527.conf --sentinel
+sudo redis-server sentinel-9528.conf --sentinel
+sudo redis-server sentinel-9529.conf --sentinel
+```
+
+3. 修改`application`.properties`配置文件
+```properties
+# Redis（单台配置）
+#spring.redis.host=127.0.0.1  
+#spring.redis.port=9527
+
+# 配置Redis集群
+# 配置哨兵的连接地址，程序需要连接到哨兵，利用服务器获取Redis的主服务器
+spring.redis.sentinel.nodes=127.0.0.1:29527,127.0.0.1:29528,127.0.0.1:29529
+# 配置集群名称，名称来自哨兵的配置文件
+spring.redis.sentinel.master=mymaster
+# 配置主服务器密码
+spring.redis.password=maqf
+```
+
+
+# 十、SpringBoot非Web项目
+
+> 没有Web 依赖的项目就是非Web项目
+
+## 1. 实现方式一
+
+1. 新建SpringBoot工程，无需添加任何起步依赖
+2. 编写程序代码
+- `com.example.service.TestService.java`
+```java
+package com.example.service;
+
+public interface TestService {
+    void test();
+}
+```
+- `com.example.service.impl.TestServiceImpl.java`
+```java
+package com.example.service.impl;  
+  
+import com.example.service.TestService;  
+import org.springframework.stereotype.Service;  
+  
+@Service  
+public class TestServiceImpl implements TestService {  
+    @Override  
+    public void test() {  
+        System.out.println("test service~");  
+    }  
+}
+```
+- `com.example.SpringBoot13Webless01Application.java`
+```java
+package com.example;  
+  
+import com.example.service.impl.TestServiceImpl;  
+import org.springframework.boot.SpringApplication;  
+import org.springframework.boot.autoconfigure.SpringBootApplication;  
+import org.springframework.context.ConfigurableApplicationContext;  
+  
+@SpringBootApplication  
+public class SpringBoot13Webless01Application {  
+  
+   public static void main(String[] args) {  
+      ConfigurableApplicationContext app = SpringApplication.run(SpringBoot13Webless01Application.class, args);  
+      TestServiceImpl testService = app.getBean(TestServiceImpl.class);  
+      testService.test();  
+   }  
+  
+}
+```
+
+## 2. 实现方式二
+
+1. 新建SpringBoot工程，无需添加任何起步依赖
+2. 编写程序代码
+- `com.example.service.TestService.java`同上
+- `com.example.service.impl.TestServiceImpl.java`同上
+-  `com.example.SpringBoot13Webless01Application.java`
+```java
+package com.example;  
+  
+import com.example.service.TestService;  
+import org.springframework.boot.CommandLineRunner;  
+import org.springframework.boot.SpringApplication;  
+import org.springframework.boot.autoconfigure.SpringBootApplication;  
+  
+import javax.annotation.Resource;  
+
+@SpringBootApplication  
+public class SpringBoot14Webless02Application implements CommandLineRunner {  
+    @Resource  
+    private TestService testService;  
+  
+    public static void main(String[] args) {  
+        SpringApplication.run(SpringBoot14Webless02Application.class, args);  
+    }  
+  
+    @Override  
+    public void run(String... args) throws Exception {  
+        testService.test();  
+    }  
+}
+```
+
+
+# 十一、SpringBoot拦截器
+
+> SpringMVC中的拦截器回顾
+
+```xml
+<!-- 配置拦截器 -->
+<mvc:interceptors>
+	<mvc:interceptor>
+		<mvc:mapping path="/test01"/>
+		<bean class="com.example.interceptor.MyInterceptor"/>
+	</mvc:interceptor>
+</mvc:interceptors>
+```
+
+**SpringBoot中拦截器的使用**
+
+1. 新建SpringBoot项目，并添加SpringWeb起步依赖
+2. 编写代码
+- `com.example.controller.TestController.java`
+```java
+package com.example.controller;  
+  
+import org.springframework.web.bind.annotation.RequestMapping;  
+import org.springframework.web.bind.annotation.RestController;  
+  
+@RestController  
+public class TestController {  
+    @RequestMapping("/test01")  
+    public String test01() {  
+        return "test01() is running~";  
+    }  
+  
+    @RequestMapping("/test02")  
+    public String test02() {  
+        return "test02() is running~";  
+    }  
+  
+    @RequestMapping("/test03")  
+    public String test03() {  
+        return "test03() is running~";  
+    }  
+}
+```
+- `com.example.interceptor.Myinterceptor.java`
+```java
+package com.example.interceptor;
+
+import org.springframework.web.servlet.HandlerInterceptor;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+// 拦截规则
+public class MyInterceptor implements HandlerInterceptor {
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        System.out.println("preHandle() is running~");
+        return false;
+    }
+}
+```
+- `com.example.conf.MyInterceptorConf.java`
+```java
+package com.example.conf;
+
+import com.example.interceptor.MyInterceptor;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistration;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+import java.lang.reflect.Array;
+import java.util.ArrayList;
+
+@Configuration
+public class MyInterceptorConf implements WebMvcConfigurer {
+    // 拦截规则配置
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        InterceptorRegistration myInterceptor = registry.addInterceptor(new MyInterceptor());
+        // 添加过滤地址
+        ArrayList<String> pathPatterns = new ArrayList<>();
+        pathPatterns.add("/**");
+        myInterceptor.addPathPatterns(pathPatterns);
+        // 添加排除过滤地址
+        ArrayList<String> exPathPatterns = new ArrayList<>();
+        exPathPatterns.add("/test02");
+        myInterceptor.excludePathPatterns(exPathPatterns);
+    }
+}
+```
+3. 启动测试
+`http://localhost:8081/test01`
+
+
+# 十二、SpringBoot使用Servlet
+
+## 1. 实现方式一
+
+1. 新建SpringBoot模块，选择SpringWeb起步依赖
+2. 编写代码
+- `com.example.servlet.TestServlet.java`
+```java
+package com.example.servlet;  
+  
+import javax.servlet.ServletException;  
+import javax.servlet.annotation.WebServlet;  
+import javax.servlet.http.HttpServlet;  
+import javax.servlet.http.HttpServletRequest;  
+import javax.servlet.http.HttpServletResponse;  
+import java.io.IOException;  
+  
+@WebServlet("/testServlet")  
+public class TestServlet extends HttpServlet {  
+    @Override  
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {  
+        this.doPost(req,resp);  
+    }  
+    @Override  
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {  
+        resp.getWriter().print("<h1>test servlet~</h1>");  
+    }  
+}
+```
+- `com.example.SpringBoot16ServletApplication.java`
+```java
+package com.example;  
+  
+import org.springframework.boot.SpringApplication;  
+import org.springframework.boot.autoconfigure.SpringBootApplication;  
+import org.springframework.boot.web.servlet.ServletComponentScan;  
+
+@SpringBootApplication  
+@ServletComponentScan(basePackages = "com.example.servlet") // 扫描servlet  
+public class SpringBoot16ServletApplication {  
+  
+    public static void main(String[] args) {  
+        SpringApplication.run(SpringBoot16ServletApplication.class, args);  
+    }  
+  
+}
+```
+
+## 2. 实现方式二
+
+1. 新建SpringBoot模块，选择SpringWeb起步依赖
+2. 编写代码
+-  `com.example.servlet.TestServlet.java`同上
+- `com.example.conf/MyServletConf.java`用于配置Servlet，将配置好的Servlet放到Spring容器里
+```java
+package com.example.conf;
+
+import com.example.servlet.TestServlet;
+import org.springframework.boot.web.servlet.ServletRegistrationBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+// 使用这种方式则不需要扫描servlet
+@Configuration
+public class MyServletConf {
+    @Bean
+    public ServletRegistrationBean<TestServlet> myServletTest() {
+        return new ServletRegistrationBean<>(new TestServlet(), "/testServlet");
+    }
+}
+```
 
 

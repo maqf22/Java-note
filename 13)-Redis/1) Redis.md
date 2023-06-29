@@ -318,6 +318,7 @@
 :- | :-
 shutdown | 关闭正在运行的redis-server
 
+> `/etc/init.d/redis-server stop
 
 # 七、启动多个redis-server
 
