@@ -1826,3 +1826,324 @@ public class MyServletConf {
 ```
 
 
+# 十三、SpringBoot使用filter
+
+> 一般情况下使用拦截器取代
+
+## 1. 实现方式一
+
+1. 创建SpringBoot模块，并添加web依赖
+2. 编写代码
+- `com.example.controller.TestController.java`
+```java
+package com.example.controller;  
+  
+import org.springframework.web.bind.annotation.RequestMapping;  
+import org.springframework.web.bind.annotation.RestController;  
+  
+@RestController  
+public class TestController {  
+    @RequestMapping("/test01")  
+    public String test01() {  
+        return "test01() is running~";  
+    }  
+  
+    @RequestMapping("/test02")  
+    public String test02() {  
+        return "test02() is running~";  
+    }  
+  
+    @RequestMapping("/test03")  
+    public String test03() {  
+        return "test03() is running~";  
+    }  
+}
+```
+- `com.example.filter.MyFilter.java`
+```java
+package com.example.filter;  
+  
+import javax.servlet.*;  
+import javax.servlet.annotation.WebFilter;  
+import java.io.IOException;  
+  
+@WebFilter("/*")  
+public class MyFilter implements Filter {  
+    @Override  
+    public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {  
+        System.out.println("doFilter() is running...");  
+        filterChain.doFilter(servletRequest, servletResponse);  
+    }  
+}
+```
+- `com.example.SpringBoot17FilterApplication.java`
+```java
+package com.example;  
+  
+import org.springframework.boot.SpringApplication;  
+import org.springframework.boot.autoconfigure.SpringBootApplication;  
+import org.springframework.boot.web.servlet.ServletComponentScan;  
+
+@SpringBootApplication  
+@ServletComponentScan(basePackages = {"com.example.filter"})  
+public class SpringBoot17FilterApplication {  
+  
+    public static void main(String[] args) {  
+        SpringApplication.run(SpringBoot17FilterApplication.class, args);  
+    }  
+  
+}
+```
+3. 测试
+
+## 2. 实现方式二
+
+1. 创建SpringBoot模块，并添加web依赖
+2. 编写代码
+- `com.example.controller.TestController.java`同上
+- `com.example.filter.MyFilter.java`
+```java
+package com.example.filter;  
+  
+import javax.servlet.*;  
+import javax.servlet.annotation.WebFilter;  
+import java.io.IOException;  
+
+public class MyFilter implements Filter {  
+    @Override  
+    public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {  
+        System.out.println("doFilter() is running...");  
+        filterChain.doFilter(servletRequest, servletResponse);  
+    }  
+}
+```
+- `com.example.conf.MyFilterConf.java`
+```java
+package com.example.conf;  
+  
+import com.example.filter.MyFilter;  
+import org.springframework.boot.web.servlet.FilterRegistrationBean;  
+import org.springframework.context.annotation.Bean;  
+import org.springframework.context.annotation.Configuration;  
+  
+@Configuration  
+public class MyFilterConf {  
+    @Bean  
+    public FilterRegistrationBean<MyFilter> myFilterTest() {  
+        FilterRegistrationBean<MyFilter> myFilter = new FilterRegistrationBean<>(new MyFilter());  
+        myFilter.addUrlPatterns("/test01");  
+        return myFilter;  
+    }  
+}
+```
+- `com.example.SpringBoot17FilterApplication.java`
+```java
+package com.example;  
+  
+import org.springframework.boot.SpringApplication;  
+import org.springframework.boot.autoconfigure.SpringBootApplication;  
+import org.springframework.boot.web.servlet.ServletComponentScan;  
+
+@SpringBootApplication
+public class SpringBoot17FilterApplication {  
+  
+    public static void main(String[] args) {  
+        SpringApplication.run(SpringBoot17FilterApplication.class, args);  
+    }  
+  
+}
+```
+3. 测试
+
+
+# 十四、SpringBoot打包部署
+
+## 1. WAR打包
+
+1. 创建SpringBoot项目，并选择Web起步依赖
+2. 创建项目时选择`war`包，打包方式
+3. 编写测试用控制器代码
+4. 通过IDEA自带打包工具进行打包（双击package打包）
+![[Pasted image 20230630110739.png]]
+5. 将打包好的`war`包文件改名，并放到tomcat的家目录中
+6. 浏览器端输入地址测试
+
+## 2. JAR打包
+
+1. 创建SpringBoot模块，并选择`Web`起步依赖
+2. 选择`jar`包，打包方式
+3. 编写测试控制器代码
+4. 测试运行并使用打包工具打包
+5. 将打好的jar包复制到任意你喜欢的位置
+6. 通过`java -jar xxx.jar`运行`jar`包，或者编写启动脚本，方便日后使用
+
+
+# 十五、SpringBoot Session
+
+![[Pasted image 20230630142521.png]]
+
+> SpringBoot Session的功能是解决在负载均衡过程中，交互过程中SessionID不一致导致的Session丢失问题
+
+**解决方案**
+
+1. 使用Nginx中的IPHash负截均衡策略，但这种方式会导致服务器压力过载（不推荐）
+2. 使用Tomcat容器的插件来实现Session的共享（将Session存入Redis中），但是由于Web依赖容器，因此每次更新服务器都需要配置插件
+3. 利用SpringSession来实现，它将Session存入到Redis中，不依赖于容器，也不需要修改程序代码即可实现Session共享（推荐）
+
+> 创建项目的时候添加`SpringSession`、`SpringWeb`、`Redis`起步依赖
+
+`application.properties`
+```properties
+spring.redis.host=127.0.0.1
+spring.redis.port=6379
+# spring redis.password=
+
+server.port=8080
+
+# 设置网站访问地址
+# 同域名下，同项目下的Session共享，适用于Nginx的负载均衡生产环境
+server.servlet.context-path=/maqf
+
+# 设置cookie的根路径，同域名下，不同项目的Session共享
+server.servlet.session.cookie.path=/
+
+# 同根域名，不同子域名Session共享
+server.servlet.session.cookie.domain=myweb.com
+```
+
+
+# 十六、SpringBoot健康监测
+
+> 检测SpringBoot的运行状态
+> 创建项目的时候添加SpringBoot Actuator起步依赖即可
+
+- `application.properties`
+```properties
+management.endpoints.web.exposure.include=*
+```
+
+
+# 十七、Thymeleaf
+
+> SpringBoot推荐使用的模板引擎，同类产品还有Freemarker等
+
+![[Pasted image 20230630175537.png]]
+
+## 1. Thymeleaf 表达式
+
+**实例**
+1. 创建SpringBoot模块，添加SpringWeb/Thymeleaf/lombok/devtools起步依赖
+2. 编辑`application.properties`配置文件
+```properties
+# 开发阶段，建议关闭thymeleaf的缓存，不然没有办法看到实时页面  
+spring.thymeleaf.cache=false  
+# 去掉HTML的语法验证  
+spring.thymeleaf.mode=HTML
+```
+3. 创建实体类代码`com.example.domain.User.java`
+```java
+package com.example.domain;  
+  
+import lombok.AllArgsConstructor;  
+import lombok.Data;  
+  
+@Data  
+@AllArgsConstructor  
+public class User {  
+    public String username;  
+    public Integer age;  
+}
+```
+4. 创建控制器代码`com.example.controller.TestController.java`
+```java
+package com.example.controller;  
+  
+import com.example.domain.User;  
+import org.springframework.stereotype.Controller;  
+import org.springframework.ui.Model;  
+import org.springframework.web.bind.annotation.RequestMapping;  
+import org.springframework.web.bind.annotation.ResponseBody;  
+  
+@Controller  
+public class TestController {  
+    @RequestMapping("/test01")  
+    public String test01(Model model) {  
+        model.addAttribute("lesson", "Java");  
+        model.addAttribute("user", new User("Rose", 19));  
+        return "test01";  
+    }  
+  
+    @RequestMapping("/test")  
+    @ResponseBody  
+    public String test() {  
+        return "test() is running...";  
+    }  
+}
+```
+5. 创建页面代码
+```html
+<!DOCTYPE html>  
+<html lang="en" xmlns:th="https://www.thymeleaf.org">  
+<head>  
+    <meta charset="UTF-8">  
+    <title>test01</title>  
+</head>  
+<body>  
+  
+<h1>标准变量 - 表达式</h1>  
+<p>lesson is <span th:text="${lesson}"></span></p>  
+<p>username is <span th:text="${user.username}"></span></p>  
+<p>age is <span th:text="${user.age}"></span></p>  
+<p>username is <span th:text="${user.getUsername()}"></span></p>  
+<p>age is <span th:text="${user.getAge()}"></span></p>  
+  
+<hr/>  
+  
+<h1>选择变量 - 表达式</h1>  
+<span th:object="${user}">  
+    <p>username is <sapn th:text="*{username}"></sapn></p>  
+    <p>age is <sapn th:text="*{age}"></sapn></p>  
+    <p>username is <sapn th:text="*{getUsername()}"></sapn></p>  
+    <p>age is <sapn th:text="*{getAge()}"></sapn></p>  
+</span>  
+  
+<hr/>  
+  
+<h1>URL - 表达式</h1>  
+<a th:href="@{https://www.baidu.com}">广域网绝对路径</a><br/>  
+<a th:href="@{/test}">项目的绝对路径</a><br/>  
+<a th:href="@{test}">项目的相对路径</a><br/>  
+  
+</body>  
+</html>
+```
+6. 测试`localhost:8080/test01`
+
+## 2. Thymeleaf 常见属性
+
+属性 | 说明
+:- | :-
+`th:action` | 类似`<form>`标签的action属性，主要结合URL表达式，获取动态变量
+`th:method` | 设置请求方式，post/get;
+`th:href` | 定义超链接，主要结合URL表达式获取动态变量
+`th:src` | 用于外部资源引入
+`th:id` | 类似于普通的id属性
+`th:name` | 类似于普通的name属性
+`th:value` | 用于设置表单中的value值
+`th:attr` | 设置表单元素自定义的任意属性键值对
+`th:text` | 动态获取文本属性
+`th:onclick` | 用于点击事件
+`th:style` | 类似于普通的style属性
+`th:each` | 迭代器，遍历数组，集合...
+`th:if / th:unless` | 条件标签，unless与if相反
+`th:switch / th:case` |
+`th:line` | 
+`...` |
+
+### 1) URL相关
+
+
+
+
+
+
