@@ -2142,8 +2142,283 @@ public class TestController {
 
 ### 1) URL相关
 
+- `TestController.java`
+```java
+@RequestMapping("urlTest")  
+public String urlTest(Model model) {  
+    model.addAttribute("actionUrl", "/test");  
+    model.addAttribute("hrefUrl", "https://baidu.com");  
+    model.addAttribute("srcUrl", "/avatar.png");  
+    return "urlTest";  
+}
+```
+- `urlTest.html`
+```html
+<!DOCTYPE html>  
+<html lang="en" xmlns:th="https://www.thymeleaf.org">  
+<head>  
+    <meta charset="UTF-8">  
+    <title>Title</title>  
+</head>  
+<body>  
+  <form th:action="${actionUrl}">  
+    <button>action</button>  
+  </form>  <hr/>  <a th:href="${hrefUrl}+'/'">href</a>  
+  <hr/>  <img th:src="${srcUrl}" alt="no img" />  
+</body>  
+</html>
+```
+
+### 2) 表单设置默认值
+
+- `TestController.java`
+```java
+@RequestMapping("/edit")  
+public String edit(Model model) {  
+    model.addAttribute("user", new User("root", 0));  
+    return "edit";  
+}
+```
+- `edit.html`
+```html
+<!DOCTYPE html>
+<html lang="en" xmlin="https://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<table>
+    <form th:action="@{/update}">
+        <tr>
+            <td>用户名：</td>
+            <td>
+                <input type="text" name="username" th:value="${user.getUsername()}"/>
+            </td>
+        </tr>
+        <tr>
+            <td>年龄：</td>
+            <td>
+                <input type="number" name="age" th:value="${user.getAge()}"/>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <input type="submit" value="提交"/>
+            </td>
+        </tr>
+    </form>
+</table>
+</body>
+</html>
+```
+
+### 3) 遍历
+
+#### a. 遍历List集合
+
+- `TestController.java`
+```java
+@RequestMapping("/each")  
+public String each(Model model) {  
+    ArrayList<User> users = new ArrayList<>();  
+    users.add(new User("Lily", 19));  
+    users.add(new User("Robby", 29));  
+    model.addAttribute("users", users);  
+    return "each";  
+}
+```
+- `each.html`
+```html
+<!DOCTYPE html>  
+<html lang="en" xmlin="https://www.thymeleaf.org">  
+<head>  
+    <meta charset="UTF-8">  
+    <title>Title</title>  
+</head>  
+<body>  
+  <table border="1">  
+    <tr>      <th>序号</th>  
+      <th>名字</th>  
+      <th>年龄</th>  
+    </tr>    <tr th:each="user:${users}">  
+      <td th:text="${userStat.count}"></td>  
+      <td th:text="${user.getUsername()}"></td>  
+      <td th:text="${user.getAge()}"></td>  
+    </tr>  </table></body>  
+</html>
+```
+
+#### b. 遍历Map集合
+
+- `TestController.java`
+```java
+@RequestMapping("/eachMap")  
+public String eachMap(Model model) {  
+    HashMap<String, String> userMap = new HashMap<>();  
+    userMap.put("Jack", "28");  
+    userMap.put("Rose", "38");  
+    model.addAttribute("userMap", userMap);  
+    return "userMap";  
+}
+```
+- `eachMap.index`
+```html
+<!DOCTYPE html>  
+<html lang="en">  
+<head>  
+    <meta charset="UTF-8">  
+    <title>userMap</title>  
+</head>  
+<body>  
+<table border="1">  
+  <tr>    <th>序号</th>  
+    <th>键</th>  
+    <th>值</th>  
+  </tr>  <tr th:each="item:${userMap}">  
+    <td th:text="${itemStat.count}"></td>  
+    <td th:text="${item.getKey()}"></td>  
+    <td th:text="${item.getValue()}"></td>  
+  </tr></table>  
+</body>  
+</html>
+```
+
+#### c. 遍历数组
+
+- `TestController.java`
+```java
+@RequestMapping("/eachArr")  
+public String eachArr(Model model) {  
+    User[] users = new User[3];  
+    users[0] = new User("Tom", 16);  
+    users[1] = new User("Lily", 17);  
+    users[2] = new User("Ken", 18);  
+    model.addAttribute("userArr", users);  
+    return "userArr";  
+}
+```
+- `eachArr.html`
+```html
+<!DOCTYPE html>  
+<html lang="en" xmlns:th="https://www.thymeleaf.org">  
+<head>  
+    <meta charset="UTF-8">  
+    <title>userArr</title>  
+</head>  
+<body>  
+<table border="1">  
+  <tr>    <th>序号</th>  
+    <th>名字</th>  
+    <th>年龄</th>  
+  </tr>  <tr th:each="user:${userArr}">  
+    <td th:text="${userStat.count}"></td>  
+    <td th:text="${user.getUsername()}"></td>  
+    <td th:text="${user.getAge()}"></td>  
+  </tr></table>  
+</body>  
+</html>
+```
+
+### 4) 选择属性
+
+#### a. `th:if`
+
+- `TestController.java`
+```java
+@RequestMapping("/ifTest")  
+public String ifTest(Model model) {  
+    ArrayList<User> users = new ArrayList<>();  
+    users.add(new User("Lily", 17));  
+    users.add(new User("Rose", 18));  
+    model.addAttribute("users", users);  
+    return "ifTest";  
+}
+```
+- `ifTest.html`
+```html
+<!DOCTYPE html>  
+<html lang="en" xmlns:th="https://www.thymeleaf.org">  
+<head>  
+    <meta charset="UTF-8">  
+    <title>ifTest</title>  
+</head>  
+<body>  
+<table>  
+  <tr>    <th>序号</th>  
+    <th>名字</th>  
+    <th>年龄</th>  
+  </tr>  <tr th:each="user:${users}">  
+    <td th:text="${userStat.count}"></td>  
+    <td th:text="${user.getUsername()}"></td>  
+    <td th:if="${user.getAge() >= 18}">成年</td>  
+    <td th:if="${user.getAge() < 18}">未成年</td>  
+  </tr></table>  
+</body>  
+</html>
+```
+
+#### b. `th:switch / th:case`
+
+- `TestController.java`
+```java
+@RequestMapping("/switchTest")  
+public String switchTest(Model model) {  
+    int gender = 0;  
+    model.addAttribute("gender", gender);  
+    return "switchTest";  
+}
+```
+- `switchTest.html`
+```html
+<!DOCTYPE html>  
+<html lang="en" xmlns:th="https://www.thymeleaf.org">  
+<head>  
+    <meta charset="UTF-8">  
+    <title>switchTest</title>  
+</head>  
+<body>  
+  <span th:switch="${gender}">  
+    <p th:case="0">female</p>  
+    <p th:case="1">male</p>  
+  </span></body>  
+</html>
+```
+
+### 5) 内联属性
+
+- `inline.html`
+```html
+<script th:inline="text">
+	alert("[[${name}]]")
+</script>
+<script th:inline="javascript">
+	alert([[${name}]])
+</script>
+```
 
 
+## 3.表达式对象
 
+对象名 | 说明
+:- | :-
+`#dates` | Java.util.Date对象的实用方法
+`#calendars` | 和dates类似，Java.util.Calendar对象
+`#numbers` | 格式化数字对象的实用方法
+`#strings` | 字符串对象的实用方法：contains, startsWith, prepending/appending等
+`#objects` | 对object操作的实用方法
+`#bools` | 对布尔值求值的实用方法
+`#arrays` | 数组的实用方法
+`#lists` | list的实用方法
+`#sets` | set的实用方法
+`#maps` | map的实用方法
+`#aggregates` | 对数组或集合创建聚合的实用方法
 
+```html
+<p th:text="${#session.getAttribute('mySession')}"></p>
+<p th:text="${#request.getServletPath()}"></p>
+<p th:text="${#dates.format(nowDate, 'yyyy-mm-dd hh:mm:ss')}"></p>
+<p th:text="${#numbers.formatCurrency(price)}"></p>
+<p th:text="${#strings.substring(myStr, 3, 8)}"></p>
+```
 
