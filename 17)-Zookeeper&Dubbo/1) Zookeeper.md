@@ -453,7 +453,130 @@ numChildren | 直接子节点的数量
 
 - Curator分布式锁相关API
 
+#### 案例
+
+- `DYSTickets.java`
+```java
+package com.example.test;
+
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.framework.recipes.locks.InterProcessMutex;
+import org.apache.curator.retry.ExponentialBackoffRetry;
+
+import java.util.concurrent.TimeUnit;
+
+public class DYSTickets implements Runnable {
+    private int tickets = 50; // 票总数
+    private final InterProcessMutex lock; // 分布式锁对象
+
+    public DYSTickets() {
+        // 定义重试的策略
+        ExponentialBackoffRetry retry = new ExponentialBackoffRetry(2000, 10);
+        // 获取连接对象
+        CuratorFramework client = CuratorFrameworkFactory.builder()
+                .connectString("localhost:2181")  // 连接IP:PORT
+                .retryPolicy(retry)  // 重试策略
+                .namespace("maqf")  // 当前连接的命名空间
+                .build();  // 构建对象
+        // 启动客户端并建立连接
+        client.start();
+        // 获取分布式锁对象
+        lock = new InterProcessMutex(client, "/maqf");
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            try {
+                // 上锁
+                lock.acquire(3, TimeUnit.SECONDS);
+                if (tickets > 0) {
+                    System.out.println(Thread.currentThread().getName() + "正在出售第" + tickets + "张票");
+                    tickets--;
+                    continue;
+                }
+                System.out.println("没有了~");
+                break;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            } finally {
+                try {
+                    // 开锁
+                    lock.release();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+    }
+}
+```
+
+- `RunDYSTickets.java`
+```java
+package com.example.test;  
+  
+public class RunDYSTickets {  
+    public static void main(String[] args) {  
+        DYSTickets dysTickets = new DYSTickets();  
+        Thread a = new Thread(dysTickets, "A");  
+        Thread b = new Thread(dysTickets, "B");  
+        Thread c = new Thread(dysTickets, "C");  
+        a.start();  
+        b.start();  
+        c.start();  
+    }  
+}
+```
 
 
+# 五、Zookeeper集群搭建
 
+## 1. 集群相关角色
+
+- Leader领导者：处理事务并同步到其他的Follower
+- Follower跟随者：处理非事务请求，如果有事务请求将转发给Leader，参与投票
+- Observer观察者：不参与投票
+
+## 2. 集群搭建步骤
+
+1. 修改配置文件
+`cp /home/maqf/apache-zookeeper-3.7.0-bin/conf/zoo_sample.cfg /home/maqf/apache-zookeeper-3.7.0-bin/conf/zoo.cfg`
+
+```shell
+# 修改数据默认存放目录
+dataDir=/home/maqf/zookeeper-cluster/zookeeper-1/data
+
+# 最底部添加集群配置
+server.1=127.0.0.1:29527:39527
+server.2=127.0.0.1:29528:39528
+server.3=127.0.0.1:29529:39529
+```
+
+2. 执行统一配置脚本
+```shell
+#!/bin/bash
+
+# 创建集群配置目录
+mkdir /home/maqf/zookeeper-cluster
+
+# 拷贝独立的zookeeper到集群中备用
+cp -r /home/maqf/apache-zookeeper-3.7.0-bin /home/maqf/zookeeper-cluster/zookeeper-1
+cp -r /home/maqf/apache-zookeeper-3.7.0-bin /home/maqf/zookeeper-cluster/zookeeper-2
+cp -r /home/maqf/apache-zookeeper-3.7.0-bin /home/maqf/zookeeper-cluster/zookeeper-3
+
+# 写入id
+echo 1 > /home/maqf/zookeeper-cluster/zookeeper-1/data/myid
+echo 2 > /home/maqf/zookeeper-cluster/zookeeper-2/data/myid
+echo 3 > /home/maqf/zookeeper-cluster/zookeeper-3/data/myid
+
+# 修改配置文件中的端口号
+sed -i "s/2181/2182/g" /home/maqf/zookeeper-cluster/zookeeper-2/conf/zoo.cfg
+sed -i "s/2181/2183/g" /home/maqf/zookeeper-cluster/zookeeper-3/conf/zoo.cfg
+
+# 修改配置文件中的data目录
+sed -i "s/zookeeper-1/zookeeper-2/g" /home/maqf/zookeeper-cluster/zookeeper-2/conf/zoo.cfg
+sed -i "s/zookeeper-1/zookeeper-3/g" /home/maqf/zookeeper-cluster/zookeeper-3/conf/zoo.cfg
+```
 
