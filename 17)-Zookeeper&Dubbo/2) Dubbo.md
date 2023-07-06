@@ -146,6 +146,7 @@ import com.example.domain.User;
 
 import java.util.List;
 
+@Component
 public interface UserService {
     List<User> findAll();
     User findById(int id);
@@ -198,7 +199,7 @@ server.port=8082
 # 应用名称
 dubbo.application.name=dubbo-provider
 # 注册中心
-dubbo.registry.address=zookeeper://127.0.0.1:2181
+dubbo.registry.address=zookeeper://localhost:2181
 # 指定协议和端口号
 dubbo.protocol.name=dubbo
 dubbo.protocol.port=29527
@@ -292,9 +293,151 @@ server.port=8081
 # 应用名称
 dubbo.application.name=dubbo-consumer
 # 注册中心
-dubbo.registry.address=zookeeper://127.0.0.1:2181
+dubbo.registry.address=zookeeper://localhost:2181
+```
+- `com.example.controller.UserController.java`
+```java
+package com.example.controller;
+
+import com.example.domain.User;
+import com.example.service.UserService;
+import org.apache.dubbo.config.annotation.DubboReference;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+@RestController
+public class UserController {
+    // unicast=false 表示广播给所有订阅者，默认表示单播给自己地址的订阅者
+    @DubboReference(version = "1.0", parameters = {"unicast", "false"})
+    private UserService userService;
+
+    @RequestMapping("/findAll")
+    public List<User> findAll() {
+        return userService.findAll();
+    }
+
+    @RequestMapping("/findById/{id}")
+    public User findById(@PathVariable int id) {
+        return userService.findById(id);
+    }
+}
+```
+- `DubboConsumerApplication.java`
+```java
+package com.example;  
+  
+import org.springframework.boot.SpringApplication;  
+import org.springframework.boot.autoconfigure.SpringBootApplication;  
+  
+@SpringBootApplication  
+public class DubboConsumerApplication {  
+    public static void main(String[] args) {  
+        SpringApplication.run(DubboConsumerApplication.class, args);  
+    }  
+}
 ```
 
+> [!Tip]
+> 如果不能同时运行两个可能是IDEA的问题，一个正常运行一个用Debug模式运行一般可以解决
+
+
+# 四、Dubbo-admin
+
+## 1.安装步骤
+
+- 官网下载后解压 https://github.com/apache/dubbo-admin/tree/master
+- 下载并安装Node.js
+- 前后端分开部署
+
+- 后端：SpringBoot打包部署启动，部署 期间需要修改项目中的配置文件
+1.  `application.properties`
+```properties
+server.port=9527
+
+# 修改为自己的注册中心配置，格式:协议://IP地址:端口号
+admin.registry.address=zookeeper://localhost:2181
+admin.config-center=zookeeper://localhost:2181
+admin.metadata-report.address=zookeeper://localhost:2181
+```
+2. 打包启动
+	1. 通过IDEA中的MAVEN工具打包
+	2. 在命令执行`java -jar xxxx.jar`启动后端服务
+
+- 前端：通过Node.js打包部署启动，部署期间需要修改项目中的配置文件
+1. 进入`vue.config.js`配置文件并修改内容
+```js
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+const path = require('path');
+
+module.exports = {
+  outputDir: "target/dist",
+  lintOnSave: "warning",
+  devServer: {
+    port: 8088,
+    historyApiFallback: {
+      rewrites: [
+        {from: /.*/, to: path.posix.join('/', 'index.html')},
+      ],
+    },
+    publicPath: '/',
+    proxy: {
+      '/': {
+        target: 'http://localhost:9527/',
+        changeOrigin: true,
+        pathRewrite: {
+          '^/': '/'
+        }
+      }
+    }
+  },
+  configureWebpack: {
+    devtool: process.env.NODE_ENV === 'dev' ? 'source-map' : undefined,
+    performance: {
+      hints: false
+    },
+    optimization: {
+      splitChunks: {
+        cacheGroups: {
+          reactBase: {
+            name: 'braceBase',
+            test: (module) => {
+              return /brace/.test(module.context);
+            },
+            chunks: 'initial',
+            priority: 10,
+          },
+          common: {
+            name: 'vendor',
+            chunks: 'initial',
+            priority: 2,
+            minChunks: 2,
+          },
+        }
+      }
+    }
+  }
+};
+```
+2. `npm install` & `npm run dev`
 
 
 
