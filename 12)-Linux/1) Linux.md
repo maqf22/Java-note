@@ -603,7 +603,7 @@ examples:
 ## 2. 系统默认安装的服务
 
 - 确定服务分类
-	- `chkconfig --list` 查看服务的自启状态
+	- `chkconfig --list`查看服务的自启状态
 	- 运行级别：0 - 6
 		- 0：关机
 		- 1：单用户模式
@@ -614,6 +614,10 @@ examples:
 		- 6：重新启动
 	- runlevel：查询系统当前运行级别
 	- 配置文件：/etc/inittab
+
+- ubuntu自启管理
+	- `systemctl list-unit-files` 列出所启动项
+	- `systemctl disable nginx.service` 禁用自启
 
 - 独立的服务管理器
 	- 启动服务
