@@ -520,6 +520,11 @@ public List test03() {
     users.add(new User("Rost", 17));  
     return users;  
 }
+
+@RequestMapping("/test04")  
+public User test04(String name, Integer age) {  
+    return new User(name, age);  
+}
 ```
 3. 创建服务消费者`SC-01-Consumer`
 - `com.example.controller.ConsumerController.java`
@@ -551,9 +556,194 @@ public String test03() {
     for (Object user : userList) {  
         System.out.println(user + " <=> " + user.getClass());  
     }  
-    return "服务消费者test02正在消费 => " + userList;  
+    return "服务消费者test03正在消费 => " + userList;  
+}
+
+@RequestMapping("/test04")  
+public String test04(User user) {  
+    // 方法一  
+    /*String URL = "http://SC-05-PROVIDER/test04?name={0}&age={1}";  
+    ResponseEntity<User> response = restTemplate.getForEntity(URL, User.class, user.getName(), user.getAge());*/  
+    // 方法二  
+    String URL = "http://SC-05-PROVIDER/test04?name={name}&age={age}";  
+    HashMap<String, Object> args = new HashMap<>();  
+    args.put("name", user.getName());  
+    args.put("age", user.getAge());  
+    ResponseEntity<User> response = restTemplate.getForEntity(URL, User.class, args);  
+  
+    User info = response.getBody();  
+    return "服务消费者test04正在消费 => " + info;  
+}
+
+@RequestMapping("/test05")  
+public String test05() {  
+    String URL = "http://SC-05-PROVIDER/test02";  
+    User user = restTemplate.getForObject(URL, User.class);  
+    return "服务消费者test05正在消费 => " + user;  
 }
 ```
+
+## 2. RestTemplate的POST请求
+
+> POST请求方式常用语 - 插入数据
+> 注意：POST的请求效率要低于GET请求方式，除非服务提供者指定的POST提交方式，否则能不用尽量不用
+
+POST与GET请求方式类似
+```java
+restTemplate.postForObject();
+restTemplate.postForEntity();
+restTemplate.postForLocation();
+```
+
+**案例**
+
+- `ProviderController.java`
+```java
+@PostMapping("/test06")  
+public User test06(String name, Integer age) {  
+    return new User(name, age);  
+}
+```
+
+- `ConsumerController.java`
+```java
+@RequestMapping("/test06")
+    public String test06(User user) {
+        /*String URL = "http://SC-05-PROVIDER/test06?name={name}&age={age}";
+        HashMap<String, Object> args = new HashMap<>();
+        args.put("name", user.getName());
+        args.put("age", user.getAge());
+        User resUser = restTemplate.postForObject(URL, Object.class, User.class, args);*/
+
+        String URL = "http://SC-05-PROVIDER/test06";
+        LinkedMultiValueMap<String, Object> lmvm = new LinkedMultiValueMap<>();
+        lmvm.add("name", user.getName());
+        lmvm.add("age", user.getAge());
+        User resUser = restTemplate.postForObject(URL, lmvm, User.class);
+        return "User => " + resUser;
+    }
+```
+
+## 3. RestTemplate的PUT请求
+
+> PUT请求方式常用语 - 修改数据
+
+```java
+restTemplate.put();
+```
+
+**案例**
+
+- `ProviderController.java`
+```java
+@PutMapping("/test07")  
+public void test07(String name, Integer age) {  
+    System.out.println("name = " + name + ", age = " + age);  
+}
+```
+
+- `ConsumerController.java`
+```java
+@RequestMapping("/test07")
+public String test07(User user) {
+	/*String URL = "http://SC-05-PROVIDER/test07?name={name}&age={age}";
+	HashMap<String, Object> args = new HashMap<>();
+	args.put("name", user.getName());
+	args.put("age", user.getAge());*/
+
+	String URL = "http://SC-05-PROVIDER/test07";
+	LinkedMultiValueMap<String, Object> args = new LinkedMultiValueMap<>();
+	args.add("name", user.getName());
+	args.add("age", user.getAge());
+	restTemplate.put(URL, args);
+	return "Success put";
+}
+```
+
+## 4. RestTemplate的DELETE请求
+
+> DELETE请求常用语 -删除数据
+
+```java
+restTemplate.delete();
+```
+
+**案例**
+
+- `ProviderController.java`
+```java
+@DeleteMapping("/test08")
+public void test08(String name, Integer age) {
+	System.out.println("name = " + name + ", age = " + age);
+}
+```
+
+- `ConsumerController.java`
+```java
+@RequestMapping("/test08")
+public String test08(User user) {
+	/*String URL = "http://SC-05-PROVIDER/test08?name={0}&age={1}";
+	restTemplate.delete(URL, user.getName(), user.getAge());*/
+
+	String URL = "http://SC-05-PROVIDER/test08?name={name}&age={age}";
+	HashMap<String, Object> args = new HashMap<>();
+	args.put("name", user.getName());
+	args.put("age", user.getAge());
+	restTemplate.delete(URL, args);
+	return "Success Delete";
+}
+```
+
+
+# 八、服务熔断Hystrix
+
+> 场景：假设A服务莫名其妙出现延迟了，由于A服务延迟，那么假设B服务调用了A服务，那么B服务也会跟着延迟，如果这时出现大量的访问，就会形成**请求堆积**卡住不动了。那么这个时候用户的访问就会是无响应的状态，如果这个时候还有其他服务，比如C、D服务都想访问A或者B服务中的某一个，依然是继续堆积，然后这些堆积的请求将会被挂起。这个时候就会出现**故障蔓延**最终导致整个分布式的系统全部瘫痪。
+> 处理：服务熔断（保险丝）就是用来解决上述问题。
+
+## 1. 快速上手
+
+1. 服务消费者`pom.xml`中添加依赖
+```xml
+<dependency>
+	<groupId>org.springframework.cloud</groupId>
+	<artifactId>spring-cloud-starter-netflix-hystrix</artifactId>
+</dependency>
+```
+
+2. 引导类中添加注解
+```java
+package com.example;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.SpringCloudApplication;
+import org.springframework.cloud.client.circuitbreaker.EnableCircuitBreaker;
+import org.springframework.cloud.netflix.eureka.EnableEurekaClient;
+
+
+// Generated by https://start.springboot.io
+// 优质的 spring/boot/data/security/cloud 框架中文文档尽在 => https://springdoc.cn
+
+@SpringBootApplication
+@EnableEurekaClient
+@EnableCircuitBreaker // 表示邀活hystrix熔断
+// 该注解表示这是一个SpringCloud项目，所以同时包含以上三个注解
+// @SpringCloudApplication
+public class Sc06ConsumerApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(Sc06ConsumerApplication.class, args);
+    }
+
+}
+```
+
+3. 服务消费者中，相关请求服务测试
+```
+```
+
+
+
 
 
 
