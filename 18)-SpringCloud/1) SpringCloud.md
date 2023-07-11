@@ -739,8 +739,654 @@ public class Sc06ConsumerApplication {
 ```
 
 3. 服务消费者中，相关请求服务测试
+```java
+package com.example.controller;
+
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixProperty;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+
+import javax.annotation.Resource;
+
+@RestController
+public class ConsumerController {
+    @Resource
+    private RestTemplate restTemplate;
+
+    public String error() {
+        return "Provider Error!";
+    }
+    // 设置请求方法的熔断，当该服务调用的其他服务出现异常或超时时，调用指定的回调函数
+    // @HystrixProperty 中 name 为属性名，value 为属性值（默认延迟时间为1s）
+    @HystrixCommand(fallbackMethod = "error", commandProperties = {
+            @HystrixProperty(
+                    name="execution.isolation.thread.timeoutInMilliseconds",
+                    value="3000"
+            )
+    })
+    /*如果消费远程服务的时候出现了问题，也会导致当前的服务调用出现问题
+    就会执行fallbackMethod对应的毁掉方法，实现服务的降级
+    用fallbackMethod指向的方法，来替换当前要访问的服务*/
+    @RequestMapping("/test")
+    public String test() {
+        String URL = "http://SC-06-PROVIDER/test";
+        String res = restTemplate.getForObject(URL, String.class);
+        return "Consumer => " + res;
+    }
+}
 ```
+
+4. 服务提供者中制造异常或者延迟
+```java
+package com.example.controller;
+
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class ProviderController {
+    @RequestMapping("/test")
+    public String test() {
+        // System.out.println(1/0);
+        try {
+            Thread.sleep(10000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        return "Provider test() info~";
+    }
+}
 ```
+
+5. 访问服务消费者test请求进行测试
+
+## 2. Hystrix的异常处理
+
+### 1) 捕获异常
+
+```java
+// 可以通过 throwable获取异常相关的信息
+// 如果是远程的服务提供者出现了内部错误，捕获到的异常类型为 HttpServerErrorException$InternalServerError
+// 如果是因为超时，得到的异常类型为 HystrixTimeoutException
+// 如果是当前服务中有异常出现，将会得到具体的异常信息，如：空指针异常、除零错误等...
+// 注意：远程服务提供者中的具体服务中的异常不能精确的获取到
+public String error(Throwable throwable) {
+	System.out.println(throwable.getClass());
+	System.out.println(throwable.getMessage());
+	return "Provider Error!";
+}
+```
+
+### 2) 忽略异常信息
+
+```java
+/*ignoreExceptions 属性为表示为要忽略掉的异常类型，值为class类型的数组
+其中要忽略掉的异常类型必须为Throwable 或其子类类型
+如果忽回复了指定的某个类型的异常之后，如果出现了这个异常，将不触发熔断，直接抛出异常给用户
+抛出异常的规则，遵循捕获异常的规则*/
+@HystrixCommand(fallbackMethod = "error",ignoreExceptions = {NullPointerException.class})
+@RequestMapping("/test")
+public String test() {
+	String str = null;
+	System.out.println(str.length());
+	String URL = "http://SC-06-PROVIDER/test";
+	String res = restTemplate.getForObject(URL, String.class);
+	return "Consumer => " + res;
+}
+```
+
+### 3) 自定义异常熔断器
+
+1. 自定义一个远程服务熔断器
+```java
+package com.example.hystrix;
+
+import com.netflix.hystrix.HystrixCommand;
+import com.netflix.hystrix.HystrixCommandGroupKey;
+import org.springframework.web.client.RestTemplate;
+
+public class MyHystrixCommand extends HystrixCommand<String> {
+
+    private String url;
+    private RestTemplate restTemplate;
+
+    // 定义构造方法，通过参数初始化设置
+    public MyHystrixCommand (String url, RestTemplate restTemplate) {
+        this(HystrixCommand.Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey("")));
+        this.url = url;
+        this.restTemplate = restTemplate;
+    }
+
+    // 此构造方法的参数为熔断器的设置对象
+    protected MyHystrixCommand(Setter setter) {
+        super(setter);
+    }
+
+    // 这个方法来自于抽象父类，这个方法用于访问远程服务提供者，不支持手动调用
+    @Override
+    protected String run() throws Exception {
+        // return null;
+        return restTemplate.getForObject(url, String.class);
+    }
+
+    // 自定义服务降级方法，同样来自于抽象父类
+    // 如果 run 方法执行的时候出现异常，将自动执行这个服务的降级方法进行熔断处理
+    // return 返回值用于替代真实的返回信息
+    @Override
+    protected String getFallback() {
+        return "something error~";
+    }
+}
+```
+
+2. 定义远程服务提供者
+```java
+@RestController
+public class ProviderController {
+    @RequestMapping("/test")
+    public String test() {
+        System.out.println(1/0);
+        /*try {
+            Thread.sleep(10000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }*/
+        return "Provider test() info~";
+    }
+}
+```
+
+3. 定义服务消费者
+```java
+@RequestMapping("/test01")
+public Object test01() {
+	String URL = "http://SC-06-PROVIDER/test";
+	// 调用自定义熔断器的构造方法，设置熔断器
+	MyHystrixCommand myHystrixCommand = new MyHystrixCommand(URL, restTemplate);
+	String info = myHystrixCommand.execute();
+	return "服务消费者 => " + info;
+}
+```
+
+## 3. Hystrix仪表盘监控
+
+> 用于试试监控拥有Hystrix服务的健康状态
+
+1. 创建工程选择web起步依赖，之后在pom.xml中添加仪表盘坐标
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.3.12.RELEASE</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>SC-06-HystrixDashboard</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>SC-06-HystrixDashboard</name>
+    <description>SC-06-HystrixDashboard</description>
+    <properties>
+        <java.version>1.8</java.version>
+        <spring-cloud.version>Hoxton.SR11</spring-cloud.version>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        
+        <!-- 在依赖中添加仪表盘相关依赖 -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-hystrix-dashboard</artifactId>
+        </dependency>
+        
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <!-- 添加SpringCloud依赖管理 -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
+```
+
+2. 在引导类中激活仪表盘功能
+```java
+@EnableHystrixDashboard
+```
+
+3. application.properties配置文件中设置端口号，以及Hystrix允许列表
+```properties
+server.port=9527
+hystrix.dashboard.proxy-stream-allow-list=*
+```
+
+4. 启动工程并访问`localhost:9527/hystrix`
+![[Pasted image 20230711142244.png]]
+
+5. 在要监控的服务中添加健康检测依赖
+```xml
+<!-- 健康检查机制依赖 -->
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-actuator</artifactId>
+</dependency>
+```
+
+6. 在要监控的服务中设置健康检测配置
+```properties
+management.endpoints.web.exposure.include=*  
+#management.endpoints.web.exposure.include=hystrix.stream
+```
+
+7. 在要监控的服务中心打开健康检测中心 `localhost:8081/actuator`
+![[Pasted image 20230711143807.png]]
+
+8. 访问触发熔断查看效果
+9. 仪表盘内容解读
+![[Pasted image 20230711144057.png]]
+
+
+# 九、Feign声明式消费
+
+## 1. 快速上手
+
+1. 准备工作
+
+- 分别准备好一个注册中心，添加起步依赖：web / eureka-server
+- 一个服务提供者，添加起步依赖：web / eureka-client
+- 一个服务消费者，添加起步依赖：openfeign / web / eureka-client
+
+```xml
+<!-- feign依赖 -->
+<dependency>
+	<groupId>org.springframework.cloud</groupId>
+	<artifactId>spring-cloud-starter-openfeign</artifactId>
+</dependency>
+```
+
+2. 在服务提供者中添加控制器代码
+```java
+package com.example.controller;
+
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class ProviderController {
+    @RequestMapping("/test")
+    public String test() {
+        return "Provider info~";
+    }
+}
+```
+
+3. 在服务消费者模块中添加接口类 `com.example.service.TestService.java`
+```java
+package com.example.service;
+
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.RequestMapping;
+
+// name/value属性用于指向某个需要访问的服务
+@FeignClient(name = "SC-07-PROVIDER")
+public interface TestService {
+    /*这里的 /test 表示具体访问的远程服务的访问路径，也就是 provider 中的 test
+    返回值是远程服务返回的数据封装对象，根据实际情况而定*/
+    @RequestMapping("/test")
+    String test();
+}
+```
+
+4. 在服务消费者模块中添加控制器 `com.example.controller.ConsumerController.java`
+```java
+package com.example.controller;
+
+import com.example.service.TestService;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import javax.annotation.Resource;
+
+@RestController
+public class ConsumerController {
+    @Resource
+    private TestService testService;
+    @RequestMapping("/test")
+    public String test() {
+        String info = testService.test();
+        return "服务消费者 test 正在消费 => " + info;
+    }
+}
+```
+
+5.  在服务消费者引导类中添加激活注解
+```java
+@EnableFeignClients // 激活FeignClients
+```
+
+6. 访问服务消费者链接进行测试
+
+## 2. 返回实体类
+
+1. 分别在服务消费者和提供者两端创建实体类User
+- `com.example.domain.User.java`
+```java
+package com.example.domain;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@ToString
+public class User {
+    private String name;
+    private Integer age;
+}
+```
+
+2. 服务提供者
+- `com.example.controller.ProviderController.java`
+```java
+@RequestMapping("/test02")  
+public User test02() {  
+    return new User("Jack", 29);  
+}
+```
+
+3. 服务消费者
+- `com.example.service.TestService.java`
+```java
+package com.example.service;  
+  
+import com.example.domain.User;  
+import org.springframework.cloud.openfeign.FeignClient;  
+import org.springframework.web.bind.annotation.RequestMapping;  
+  
+// name/value属性用于指向某个需要访问的服务  
+@FeignClient(name = "SC-07-PROVIDER")  
+public interface TestService {  
+    /*这里的 /test 表示具体访问的远程服务的访问路径，也就是 provider 中的 test    返回值是远程服务返回的数据封装对象，根据实际情况而定*/  
+    @RequestMapping("/test")  
+    String test();  
+  
+    @RequestMapping("/test02")  
+    User test02();  
+}
+```
+- `com.example.controller.ConsumerController.java`
+```java
+@RequestMapping("/test02")
+public String test02() {
+	User user = testService.test02();
+	return "服务消费者 test02 正在消费 => " + user;
+}
+```
+
+4. 测试`localhost:8080/test02`
+
+## 3. 返回List集合
+
+1. 服务提供者
+```java
+@RequestMapping("/test03")
+public List<User> test03() {
+	ArrayList<User> userList = new ArrayList<>();
+	userList.add(new User("Jack", 29));
+	userList.add(new User("Rose", 28));
+	return userList;
+}
+```
+
+2. 服务消费者
+- `com.example.service.TestService.java`
+```java
+package com.example.service;
+
+import com.example.domain.User;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.RequestMapping;
+
+import java.util.List;
+
+// name/value属性用于指向某个需要访问的服务
+@FeignClient(name = "SC-07-PROVIDER")
+public interface TestService {
+    /*这里的 /test 表示具体访问的远程服务的访问路径，也就是 provider 中的 test
+    返回值是远程服务返回的数据封装对象，根据实际情况而定*/
+    @RequestMapping("/test")
+    String test();
+
+    @RequestMapping("/test02")
+    User test02();
+
+    @RequestMapping("/test03")
+    List<User> test03();
+}
+```
+- `com.example.controller.ConsumerController.java`
+```java
+@RequestMapping("/test03")
+public String test03() {
+	List<User> userList = testService.test03();
+	return "服务消费者 test02 正在消费 => " + userList;
+}
+```
+
+3. 访问服务消费者测试 `localhost:8080/test03`
+
+## 4. 传递参数
+
+### 1) 普通参数传递
+
+1. 服务提供者
+```java
+@RequestMapping("/test04")
+public User test04(String name, Integer age) {
+	return new User(name, age);
+}
+```
+
+2. 服务消费者
+- `com.example.service.TestService.java`
+```java
+@RequestMapping("/test04")
+User test04(@RequestParam("name") String name, @RequestParam("age") Integer age);
+```
+- `com.example.controller.ConsumerController.java`
+```java
+@RequestMapping("/test04")
+public String test04(String name, Integer age) {
+	User user = testService.test04(name, age);
+	return "服务消费者 test02 正在消费 => " + user;
+}
+```
+
+3. 访问服务消费者测试 `http://localhost:8080/test04?name=Jack&age=22`
+
+### 2) 实体类参数传递 
+
+1. 服务提供者
+```java
+@RequestMapping("/test05")  
+public User test05(@RequestBody User user) {  
+    return user;  
+}
+```
+
+2. 服务的消费者
+- `com.example.service.TestService.java`
+```java
+/*@RequestBody 用于标记当前形参为请求体，也就是说这个参数是请求的数据封装对象
+如果服务提供者也需要获取到这个数据
+那么服务提供者的控制器方法也必须使用一个实体类或Map集合来接收数据
+并且也要标记 @RequestBody*/
+@RequestMapping("/test05")
+User test05(@RequestBody User user);
+```
+- `com.example.controller.ConsumerController.java`
+```java
+@RequestMapping("/test05")
+public String test05(User user) {
+	User resUser = testService.test05(user);
+	return "服务消费者 test02 正在消费 => " + resUser;
+}
+```
+
+3. 访问测试 `http://localhost:8080/test05?name=Jack&age=22`
+
+## 5. 负载均衡
+
+> 参考Ribbon负载均衡策略的调整。
+
+##  6. 服务熔断
+
+1. 服务消费者application.properties
+```properties
+# 开启Feign对于Hystrix服务熔断的支持true表示开启，默认false表示关闭  
+feign.hystrix.enabled=true
+```
+
+2. `com.example.service.TestService.java`类注解上添加fallback 属性
+```java
+// name/value属性用于指向某个需要访问的服务
+// fallback用于指定熔器类的class，如果是远程调用服务时出现异常则触发熔断器
+// 如果需要当前服务中的某个控制器方法进行熔断，仍然需要配置之前的Hystrix
+@FeignClient(name = "SC-07-PROVIDER", fallback = MyHystrix.class)
+// 或
+@FeignClient(name = "SC-07-PROVIDER", fallbackFactory = MyHystrix.class)
+```
+
+3. 自定义`com.example.hystrix.MyHystrix.java`类并实现TestService接口
+```java
+package com.example.hystrix;
+
+import com.example.domain.User;
+import com.example.service.TestService;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+@Component
+public class MyHystrix implements TestService {
+    @Override
+    public String test() {
+        return "test() is down~";
+    }
+
+    @Override
+    public User test02() {
+        return null;
+    }
+
+    @Override
+    public List<User> test03() {
+        return null;
+    }
+
+    @Override
+    public User test04(String name, Integer age) {
+        return null;
+    }
+
+    @Override
+    public User test05(User user) {
+        return null;
+    }
+}
+
+// ==========
+
+// fallbackFactory写法
+@Component  
+public class MyHystrixFactory implements FallbackFactory<TestService> {  
+  
+    @Override  
+    public TestService create(Throwable throwable) {  
+        return new TestService() {  
+            @Override  
+            public String test() {  
+                return "test() is down~";  
+            }  
+  
+            @Override  
+            public User test02() {  
+                return null;  
+            }  
+  
+            @Override  
+            public List<User> test03() {  
+                return null;  
+            }  
+  
+            @Override  
+            public User test04(String name, Integer age) {  
+                return null;  
+            }  
+  
+            @Override  
+            public User test05(User user) {  
+                return null;  
+            }  
+        };  
+    }  
+}
+```
+
+4. 在服务提供者的test中制造异常测试熔断 `http://localhost:8080/test`
+
+
+# 十、API网关Zuul
+
+![[Pasted image 20230711180240.png]]
+
+> 帮助我们过滤请求，帮助我们过滤服务，相当于是一个安全检查站，所有的外部请求都需要经过它调度和过滤，然后API网关来实现请求路由、负载均衡、权限验证等功能。
+
+## 1. 快速上手
+
+1. 创建：EurekaServer、EurekaClientProvider、EurekaClientConsumer三个模块（要求能通过EurekaClientConsumer访问EurekaClientProvider中的远程服务）
+
+2. 创建一个EurekaClientZullGateway工程，并添加Web/EurekaClient/Zuul起步依赖
+```xml
+
+```
+
+
+
 
 
 
