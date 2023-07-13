@@ -98,8 +98,8 @@ JMS是JavaEE规范中的一种，类比JDBC；
 官网：https://www.rabbitmq.com/
 环境准备
 - CentOS-7
-- otp_src_19.3.tar.gz：erLang语言支持 `https://github.com/erlang/otp/releases?page=25`
-- rabbitmq-server-3.7.2-1.el7.noarch.rpm：RabbitMQ服 `https://github.com/rabbitmq/rabbitmq-server/releases?page=24`
+- otp_src_19.3.tar.gz：erLang语言支持 `https://github.com/erlang/otp/releases?page=25 (http://www.erlang.org/download/otp_src_19.3.tar.gz)`
+- rabbitmq-server-3.7.2-1.el7.noarch.rpm：RabbitMQ服 `https://github.com/rabbitmq/rabbitmq-server/releases?page=24 (https://github.com/rabbitmq/rabbitmq-server/releases/download/v3.7.2/rabbitmq-server-3.7.2-1.el7.noarch.rpm)`
 
 ## 1. CentOS-7安装
 
@@ -121,6 +121,326 @@ systemctl stop firewalld
 ## 2. Windows Terminal的SSH连接
 
 **步骤**
+
+1. 打开Windows Terminal，点击下图位置设置
+
+![[Pasted image 20230713134927.png]]
+
+2. 在使用任一文本编辑器打开setting.json文件
+![[Pasted image 20230713135058.png]]
+
+3. Ctrl + F 搜索profiles，跳转到下图所在代码块
+![[Pasted image 20230713141308.png]]
+
+4. 添加一个新的List选项
+```json
+{
+	"guid": "{这里需要生成一个自己的GUID}",
+	"hidden": false,
+	"name": "列表选项名"，
+	"commandline": "ssh root@192.168.10.128"
+}
+```
+
+5. 在https://www.guidgen.com网站生成唯一的guid
+![[Pasted image 20230713140135.png]]
+
+6. 将刚刚生成的GUID填写到新的List选项中，保存退出即可
+
+7. 在Windows Terminal直接打开使用即可
+
+> 修改`/etc/ssh/sshd_config`配置文件`ClientAliveInterval 60`避免自动断开连接
+
+## 3. RabbitMQ安装
+
+1. 安装必要的依赖
+`yum install gcc glibc-devel make ncurses-devel openssl-devel xmlto -y`
+
+2. 用你喜欢的方式将安装包放到Liunx的家目录里
+
+3. 编写Shell脚本如下
+```shell
+#!/bin/bash
+# setup erLang & RabbitMQ
+tar -zxvf otp_src_19.3.tar.gz
+mkdir /usr/local/erlang
+cd otp_src_19.3
+./configure --prefix=/usr/local/erlang --without-javac
+make && make install
+echo 'ERL_HOME=/usr/local/erlang'>>/etc/profile
+echo 'PAHT=$ERL_HOME/bin:$PATH'>>/etc/profile
+echo 'export ERL_HOME PATH'>>/etc/porfile
+
+cd ~
+rpm -ivh --nodeps rabbitmq-server-3.7.2-1.el7.noarch.rpm
+
+# source命令只在当前的shell脚本当中生效，在新的脚本中没有作用
+source /etc/profile
+```
+
+4. 编写配置文件`vi /etc/rabbitmq/rabbitmq-env.conf`添加内容（此文件默认不存在）
+```conf
+NODENAME=rabbit@localhost
+```
+
+5. 启动查看rabbitmq-server
+`rabbitmq-server start &`
+
+
+# 四、RabbitMQ常用命令
+
+## 1. 启动与关闭
+
+### 1) 启动RabbitMQ
+```
+rabbitmq-server start &
+```
+
+> [!注意]
+> 1. 这里可能会出现错误，错误原因是/var/lib/rabbitmq/.erlang.cookie文件权限不够。
+> 	解决方案：对这个文件授权，在任意处敲下面两条命令
+> 	`chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie`
+> 	`chmod 400 /var/lib/rabbitmq/.erlang.cookie`
+> 2. 如果启动速度过慢
+> 	解决方案：修改本地IP映射文件`/etc/hosts`添加本地IP地址对应`localhost`；**注意：**修改之后需要重启系统生效
+
+### 2) 停止服务
+
+```
+rabbitmqctl stop
+```
+
+### 3) 查看服务启动状态
+
+```
+ps -ef | grep rabbitmq
+```
+
+## 2. 插件管理
+
+1. 添加插件`rabbitmq-plugins enable {插件名}
+
+2. 删除插件`rabbitmq-plugins disable {插件名}`
+
+> [!注意]
+> RabbitMQ启动以后可以使用浏览器进入管控台，但是默认情况RabbitMQ不允许直接使用浏览器进行访问。因此必须添加插件：`rabbitmq-plugins enalbe rabbitmq_management`
+
+3. 使用浏览器访问管理控台`http://RabbitMQ` 服务器端口：15672 `http://192.168.10.128:15672`
+
+	**管理控制台的使用**
+	
+	1. 激活管理插件 - `rabbitmq-plugins enable rabbitmq_management`
+	2. 启动RabbitMQ - `rabbitmq-server start &`
+
+4. 使用浏览器访问 `http://192.168.10.128:15672`
+
+5. 添加一管理员用户 `rabbitmqctl add_user root root`
+
+6. 添加用户角色 - `rabbitmqctl set_user_tags root administrator`
+
+7. 使用用户名和密码登录
+
+## 3. 用户管理
+
+RabbitMQ安装成功后使用默认用户名guest登录
+账号：guest
+密码：guest
+注意：这里guest只允许本机登录访问需要创建用户并授权远程访问命令如下
+
+1. 添加用户
+	- 语法：`rabbitmqctl add_user {username} {password}`
+	- 案例：`rabbitmqctl add_user root root`
+2. 删除用户：
+	- 语法：`rabbitmqctl delete_user {username}`
+	- 案例：`rabbitmqctl delete_user maqf`
+3. 修改密码
+	- 语法：`rabbitmqctl change_password {username} {newpassword}`
+	- 案例：`rabbitmqctl change_password root 123`
+4. 设置用户色：
+	- 语法：`rabbitmqctl set_user_tags {username} {tag}`
+	- 案例：`rabbitmqctl set_user_tags root administrator`
+	- tag为用户角色，详见下表
+
+角色 | 说明
+:- | :-
+management | 用户可以通过AMQP做的任何事外加：列出自己可以通过AMQP登入的virtual hosts，查看自己的virtual hosts中的queues, exchanges和bindings，查看和关闭自己的channels和connections，查看有关自己的virtual hosts的“全局”的统计信息，包含其他用户在这些virtual hosts中的活动
+policymaker | management可以做的任何事外加：查看、创建和删除自己的virtual hosts所属的policies和parameters
+monitoring | management可以做的任何事外加：列出所有virtual hosts，包括他们不能登录的virtual hosts，查看其他用户的connections和channels，查看节点级别的数据如clustering和memory使用情况，查看真正的关于所有virtual hosts的全局的统计信息
+administrator | policymaker和monitoring可以做的任何事外加：创建和删除virtual hosts，查看、创建和删除users，查看创建和删除permissions，关闭其他用户的connections
+
+5. 通过管控台管理用户
+
+![[Pasted image 20230713161829.png]]
+
+## 4. 权限管理
+
+1. 授权命令：
+	- 语法：`rabbitmqctl set_permissions [-p vhostpath] {user} {conf} {write} {read}`
+		- `-p vhostpath`：用于指定一个资源的命名空间，例如 -p / 表示根路径命名空间
+		- `user`：用于指定要为哪个用户授权填写用户名
+		- `conf`：一个正则表达式match哪些配置资源能够被该用户配置
+		- `write`：一个正则表达式match哪些配置资源能够被该用户写
+		- `read`：一个正则表达式match哪此配置资源能够被该用户访问
+	- 案例：`rabbitmqctl set_permissions -p / root '.*' '.*' '.*'` （用于设置root用户拥有对所有资源的读写配置权限）
+2. 查看用户权限：
+	- 语法：`rabbitmqctl list_permissions [vhostpath]`
+	- 案例：
+		- `rabbitmqctl list_permissions` 查看根路径下的所有用户权限
+		- `rabbitmqctl list_permissions /abc` 查看指定命名空间下的所有用户权限
+3. 查看指定用户下的权限：
+	- 语法：`rabbitmqctl list_user_permissions {username}`
+	- 案例：`rabbitmqctl list_user_permissions root` 查看root用户下的权限
+4. 清除用户权限：
+	- 语法：`rabbitmqctl clear_permissions {username}`
+	- 案例：`rabbitmqctl clear_permissions root` 清除root用户的权限
+5. 管控台操作：
+![[Pasted image 20230713163537.png]]
+
+## 5. vhost管理
+
+vhost是RabbitMQ中的一个命名空间，可以限制消息的存放位置利用这个命名空间可以进行权限的控制，有点类似Windows中的文件夹一样，在不同的文件夹中存放不同的文件
+
+1. 添加vhost：
+	- 语法：`rabbitmqctl add vhost {name}`
+	- 案例：`rabbitmqctl add vhost maqf`
+2. 删除vhost：
+	- 语法：`rabbitmqctl delete vhost {name}`
+	- 案例：`rabbitmqctl delete vhost maqf`
+3. 管控台操作：
+![[Pasted image 20230713164219.png]]
+
+
+# 五、RabbitMQ消息收发
+
+所有MQ产品从模型抽象角度来讲，都是一样的过程，消费者(Consumer)订阅某个队列，生产者(Provicer)创建消息，然后发布到队列(Queue)中，最后将消息发送到监听的消息者
+
+![[Pasted image 20230713165333.png]]
+
+![[Pasted image 20230713165346.png]]
+
+生产者将消息发送到Broker（用于消息收发的应用）
+在Broker中有Virual Host（命名空间）
+Virtual Host中有Exchange（交换机）
+当Exchange接收到消息之后，直接返回生产者
+Exchange最终会将消息存入Queue（队列）
+通过Binding（路由表，一个N行三列的表格结构）将消息存入到指定的队列
+当消息进入到Queue之后实现持久化存储
+Exchange不负责消息存储，就是个中转站
+消费者通过Connection（连接通道）来对队列中的消息进行消费
+如果队列中有消息，直接被拿走消费，如果没有，等消息来再消费
+
+相关概念
+
+名词 | 说明
+:- | :-
+Message | 消息，消息是不具体的，它由消息冰龙和消息体组成，消息体是不透明的，而消息头则由一系列的可选属性组成，这些属性包括：routing-key（路由键）、priority（相对于其他消息的优先权）、delivery-mode（指出该消息可能需要持久性存储）等
+Publisher | 消息的生产者，也是一个向交换器发布消息的客户端应用程序
+Exchange | 交换器，用来接收生产者发送的消息并将这些消息路由给服务器中的队列
+
+
+# 六、Exchange类型
+
+## 1. direct
+
+消息中的路由键（routing key）如果和Binding中的binding key一致，交换器就将消息发到对应的队列中。路由键与队列名完全匹配，如果一个队列绑定到交换机要求路由键为"dog"，则只转发routing key标记为"dog"的消息，不会转发"dog.puppy"，也不会转发"dog.guard"等等。它是完全匹配、单播的模式
+
+![[Pasted image 20230713170755.png]]
+
+## 2. fanout
+
+每个发到fanout类型交换器的消息都会分到所有绑定的队列上去。fanout交换器不处理路由键，只是简单的将队列绑定到交换器上，每个发送到交换器的消息都会被转发到与该交换器绑定的所有队列上。很像广播，每台子网内的主机都获得了一份复制的消息。fanout类型转发消息是最快的
+
+![[Pasted image 20230713171239.png]]
+
+## 3. topic
+
+topic（多用于定于订阅模式）交换器通过模式匹配分配消息的路由键属性，将路由键和某个模式进行匹配，此时队列需要绑定到一个模式上。它将路由键和绑定键的字符串切分成单词，这些单词之间用点隔开。它同样也会识别两个通配符：符号“#”符号“*”。# 匹配0个或多个单词，\* 匹配不多不少一个单词
+
+![[Pasted image 20230713171820.png]]
+
+
+# 七、快速上手
+
+## 1. 向MQ发送消息
+
+> 不使用Exchange交换器，向MQ发送消息
+
+1. 新建Maven模块MQ-01-Send
+
+2. 添加依赖`pom.xml`
+```xml
+<dependencies>
+	<dependency>
+		<groupId>com.rabbitmq</groupId>
+		<artifactId>amqp-client</artifactId>
+		<version>5.14.2</version>
+	</dependency>
+</dependencies>
+```
+
+3. 编写发送代码`Send.java`
+```java
+package com.example;
+
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
+
+import java.io.IOException;
+import java.util.concurrent.TimeoutException;
+
+public class Send {
+    public static void main(String[] args) throws IOException, TimeoutException {
+        // 创建连接工厂，用于指定RabbitMQ的连接信息
+        ConnectionFactory factory = new ConnectionFactory();
+        // 设置必要参数
+        factory.setHost("192.168.10.128"); // IP地址
+        factory.setPort(5672); // Broker端口
+        factory.setUsername("root"); // 用户名
+        factory.setPassword("root"); // 密码
+
+        // 新建连接（也可内部处理异常）
+        Connection connection = factory.newConnection();
+        // 通过连接创建通道
+        Channel channel = connection.createChannel();
+
+        /*
+         * 声明队列
+         * 参数一：队列名（自定义），如果队列名不存在则创建，存在则放弃
+         * 参数二：是否支持持久化
+         * 参数三：是否排外，true表示排外，如果消费者监听了这个队列则不允许其他消费者监听此队列
+         * 参数四：是否删除，true表示自动删除，如果没有消息者监听这个队列则自动删除
+         * 参数五：队列的属性设置，通常设置为null
+         * */
+        String queueName = "myQueue";
+        channel.queueDeclare(queueName, true, false, false, null);
+
+        /*
+         * 发送消息到MQ
+         * 参数一：交换机名，不使用交换机则填写空串""
+         * 参数二：消息所携带的RoutingKey，不使用交换机，此参数会被识别成队列名
+         * 参数三：消息的属性，通常设置为null
+         * 参数四：具体消息数据取值，byte[]类型
+         * */
+        String message = "Test message !~"; // 需要发送的消息，通常使用字符串
+        channel.basicPublish("", queueName, null, message.getBytes());
+
+        System.out.println("消息发送成功~");
+
+        // 释放资源
+        // 选释放通道资源
+        if (null != channel)
+            channel.close();
+        // 再释放连接资源
+        if (null != connection)
+            connection.close();
+    }
+}
+```
+
+## 2. 从MQ接收消息
+
+
 
 
 
