@@ -440,9 +440,1138 @@ public class Send {
 
 ## 2. 从MQ接收消息
 
+1. Copy之前的Send模块，并做一些常规修改
+
+2. 编写接收代码
+```java
+package com.example;
+
+import com.rabbitmq.client.*;
+
+import java.io.IOException;
+import java.util.concurrent.TimeoutException;
+
+public class Receive {
+    public static void main(String[] args) throws IOException, TimeoutException {
+        // 创建连接工厂，用于指定RabbitMQ的连接信息
+        ConnectionFactory factory = new ConnectionFactory();
+        // 设置必要参数
+        factory.setHost("192.168.10.128"); // IP地址
+        factory.setPort(5672); // Broker端口
+        factory.setUsername("root"); // 用户名
+        factory.setPassword("root"); // 密码
+
+        // 新建连接（也可内部处理异常）
+        Connection connection = factory.newConnection();
+        // 通过连接创建通道
+        Channel channel = connection.createChannel();
+
+        /*
+         * 声明队列
+         * 参数一：队列名（自定义），如果队列名不存在则创建，存在则放弃
+         * 参数二：是否支持持久化
+         * 参数三：是否排外，true表示排外，如果消费者监听了这个队列，则不允许其他消费者监听此队列
+         * 参数四：是否删除，true表示自动删除，如果没有消息者监听这个队列则自动删除
+         * 参数五：队列的属性设置，通常设置为null
+         * */
+        String queueName = "myQueue";
+        channel.queueDeclare(queueName, true, false, false, null);
+
+        // 接收代码：
+        /*
+         * 从MQ接收消息
+         * 参数一：队列名称
+         * 参数二：是否自动确认消息，true表示自动确认，当消接收后无论是否正确完成处理，都会自动从列表中称除
+         * 参数三：消息处理的回调方法
+         * 注意：
+         * basicConsume方法会在底层启动一个子线程，用于持续监听队列消息，所以不能关闭
+         * */
+        channel.basicConsume(queueName, true, new DefaultConsumer(channel) {
+            @Override
+            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
+                // super.handleDelivery(consumerTag, envelope, properties, body);
+                String message = new String(body);
+                System.out.println("接收到了 => " + message);
+            }
+        });
+    }
+}
+```
+
+3. 运行测试接收
 
 
+# 八、基于Exchange的收发
+
+## 1. 基于direct的收发
+
+1. Copy发送模块，并做必要的修改
+
+2. 编写发送代码
+```java
+package com.example;
+
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
+
+import java.io.IOException;
+import java.util.concurrent.TimeoutException;
+
+public class DirectSend {
+    public static void main(String[] args) throws IOException, TimeoutException {
+        // 创建连接工厂，用于指定RabbitMQ的连接信息
+        ConnectionFactory factory = new ConnectionFactory();
+        // 设置必要参数
+        factory.setHost("192.168.10.128"); // IP地址
+        factory.setPort(5672); // Broker端口
+        factory.setUsername("root"); // 用户名
+        factory.setPassword("root"); // 密码
+
+        // 新建连接（也可内部处理异常）
+        Connection connection = factory.newConnection();
+        // 通过连接创建通道
+        Channel channel = connection.createChannel();
+
+        /*
+         * 声明队列
+         * 参数一：队列名（自定义），如果队列名不存在则创建，存在则放弃
+         * 参数二：是否支持持久化
+         * 参数三：是否排外，true表示排外，如果消费者监听了这个队列，则不允许其他消费者监听此队列
+         * 参数四：是否删除，true表示自动删除，如果没有消息者监听这个队列则自动删除
+         * 参数五：队列的属性设置，通常设置为null
+         * */
+        String queueName = "directQueue";
+        channel.queueDeclare(queueName, true, false, false, null);
+
+        /*
+        * 声明交换机
+        * 参数一：交换机名称，如果不存在则创建，存在则放弃
+        * 参数二：交换机类型，取值为：direct fanout topic headers
+        * 参数三：是否持久化
+        * */
+        String exchangeName = "directExchange";
+        channel.exchangeDeclare(exchangeName, "direct", true);
+        /*
+        * 将队列和交换机绑定
+        * 参数一：队列名
+        * 参数二：交换机名
+        * 参数三：绑定时的BindingKey
+        * */
+        channel.queueBind(queueName, exchangeName, "directKey");
+
+        /*
+         * 发送消息到MQ
+         * 参数一：交换机名，不使用交换机则填写空串""
+         * 参数二：消息所携带的RoutingKey，不使用交换机，此参数会被识别成队列名
+         * 参数三：消息的属性，通常设置为null
+         * 参数四：具体消息数据取值，byte[]类型
+         * */
+        String message = "Test directed message !~"; // 需要发送的消息，通常使用字符串
+        // 发送时 参数一、参数二，使用具体的交换机名称和BindingKey
+        channel.basicPublish(exchangeName, "directKey", null, message.getBytes());
+
+        System.out.println("消息发送成功~");
+
+        // 释放资源
+        // 选释放通道资源
+        if (null != channel)
+            channel.close();
+        // 再释放连接资源
+        if (null != connection)
+            connection.close();
+    }
+}
+```
+
+3. 运行测试发送
+
+4. Copy发送模块，并做必要的修改
+
+5. 编写接收代码
+```java
+package com.example;
+
+import com.rabbitmq.client.*;
+
+import java.io.IOException;
+import java.util.concurrent.TimeoutException;
+
+public class DirectReceive {
+    public static void main(String[] args) throws IOException, TimeoutException {
+        // 创建连接工厂，用于指定RabbitMQ的连接信息
+        ConnectionFactory factory = new ConnectionFactory();
+        // 设置必要参数
+        factory.setHost("192.168.10.128"); // IP地址
+        factory.setPort(5672); // Broker端口
+        factory.setUsername("root"); // 用户名
+        factory.setPassword("root"); // 密码
+
+        // 新建连接（也可内部处理异常）
+        Connection connection = factory.newConnection();
+        // 通过连接创建通道
+        Channel channel = connection.createChannel();
+
+        /*
+         * 声明队列
+         * 参数一：队列名（自定义），如果队列名不存在则创建，存在则放弃
+         * 参数二：是否支持持久化
+         * 参数三：是否排外，true表示排外，如果消费者监听了这个队列，则不允许其他消费者监听此队列
+         * 参数四：是否删除，true表示自动删除，如果没有消息者监听这个队列则自动删除
+         * 参数五：队列的属性设置，通常设置为null
+         * */
+        String queueName = "directQueue";
+        channel.queueDeclare(queueName, true, false, false, null);
+
+        /*
+         * 声明交换机
+         * 参数一：交换机名称，如果不存在则创建，存在则放弃
+         * 参数二：交换机类型，取值为：direct fanout topic headers
+         * 参数三：是否持久化
+         * */
+        String exchangeName = "directExchange";
+        channel.exchangeDeclare(exchangeName, "direct", true);
+        /*
+         * 将队列和交换机绑定
+         * 参数一：队列名
+         * 参数二：交换机名
+         * 参数三：绑定时的BindingKey
+         * */
+        channel.queueBind(queueName, exchangeName, "directKey");
+
+        // 接收代码：
+        /*
+         * 从MQ接收消息
+         * 参数一：队列名称
+         * 参数二：是否自动确认消息，true表示自动确认，当消接收后无论是否正确完成处理，都会自动从列表中称除
+         * 参数三：消息处理的回调方法
+         * 注意：
+         * basicConsume方法会在底层启动一个子线程，用于持续监听队列消息，所以不能关闭
+         * */
+        channel.basicConsume(queueName, true, new DefaultConsumer(channel) {
+            @Override
+            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
+                // super.handleDelivery(consumerTag, envelope, properties, body);
+                String message = new String(body);
+                System.out.println("接收到了Direct => " + message);
+            }
+        });
+    }
+}
+```
+
+6. 运行测试接收
+
+## 2. 基于fanout的收发
+
+1. 编写接收端代码（多个接收端）
+```java
+package com.example;
+
+import com.rabbitmq.client.*;
+
+import java.io.IOException;
+import java.util.concurrent.TimeoutException;
+
+public class FanoutReceive01 {
+    public static void main(String[] args) throws IOException, TimeoutException {
+        // 创建连接工厂，用于指定RabbitMQ的连接信息
+        ConnectionFactory factory = new ConnectionFactory();
+        // 设置必要参数
+        factory.setHost("192.168.10.128"); // IP地址
+        factory.setPort(5672); // Broker端口
+        factory.setUsername("root"); // 用户名
+        factory.setPassword("root"); // 密码
+
+        // 新建连接（也可内部处理异常）
+        Connection connection = factory.newConnection();
+        // 通过连接创建通道
+        Channel channel = connection.createChannel();
+
+        /*
+         * 声明队列
+         * 参数一：队列名（自定义），如果队列名不存在则创建，存在则放弃
+         * 参数二：是否支持持久化
+         * 参数三：是否排外，true表示排外，如果消费者监听了这个队列，则不允许其他消费者监听此队列
+         * 参数四：是否删除，true表示自动删除，如果没有消息者监听这个队列则自动删除
+         * 参数五：队列的属性设置，通常设置为null
+         * */
+        // String queueName = UUID.randomUUID().toString();
+        // 设置第二个参数false - 持久化，第三个参数true - 排外，第四个参数true - 自动删除
+        // channel.queueDeclare(queueName, false, true, true, null);
+
+        // 等价于上面两行
+        String queueName = channel.queueDeclare().getQueue();
+
+        /*
+         * 声明交换机
+         * 参数一：交换机名称，如果不存在则创建，存在则放弃
+         * 参数二：交换机类型，取值为：direct fanout topic headers
+         * 参数三：是否持久化
+         * */
+        String exchangeName = "fanoutExchange";
+        channel.exchangeDeclare(exchangeName, "fanout", true);
+        /*
+         * 将队列和交换机绑定
+         * 参数一：队列名
+         * 参数二：交换机名
+         * 参数三：绑定时的BindingKey
+         * */
+        channel.queueBind(queueName, exchangeName, "");
+
+        // 接收代码：
+        /*
+         * 从MQ接收消息
+         * 参数一：队列名称
+         * 参数二：是否自动确认消息，true表示自动确认，当消接收后无论是否正确完成处理，都会自动从列表中称除
+         * 参数三：消息处理的回调方法
+         * 注意：
+         * basicConsume方法会在底层启动一个子线程，用于持续监听队列消息，所以不能关闭
+         * */
+        channel.basicConsume(queueName, true, new DefaultConsumer(channel) {
+            @Override
+            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
+                // super.handleDelivery(consumerTag, envelope, properties, body);
+                String message = new String(body);
+                System.out.println("接收到了Fanout => " + message);
+            }
+        });
+    }
+}
+```
+
+2. 编写发送端
+```java
+package com.example;
+
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
+
+import java.io.IOException;
+import java.util.concurrent.TimeoutException;
+
+public class FanoutSend {
+    public static void main(String[] args) throws IOException, TimeoutException {
+        // 创建连接工厂，用于指定RabbitMQ的连接信息
+        ConnectionFactory factory = new ConnectionFactory();
+        // 设置必要参数
+        factory.setHost("192.168.10.128"); // IP地址
+        factory.setPort(5672); // Broker端口
+        factory.setUsername("root"); // 用户名
+        factory.setPassword("root"); // 密码
+
+        // 新建连接（也可内部处理异常）
+        Connection connection = factory.newConnection();
+        // 通过连接创建通道
+        Channel channel = connection.createChannel();
+
+        // 声明队列（不需要创建队列）
+        // String queueName = "directQueue";
+        // channel.queueDeclare(queueName, true, false, false, null);
+
+        /*
+         * 声明交换机
+         * 参数一：交换机名称，如果不存在则创建，存在则放弃
+         * 参数二：交换机类型，取值为：direct fanout topic headers
+         * 参数三：是否持久化
+         * */
+        String exchangeName = "fanoutExchange";
+        channel.exchangeDeclare(exchangeName, "fanout", true);
+
+        // 将队列和交换机绑定（不需要绑定，因不知道发给谁）
+        // channel.queueBind(queueName, exchangeName, "");
+
+        /*
+         * 发送消息到MQ
+         * 参数一：交换机名，不使用交换机则填写空串""
+         * 参数二：消息所携带的RoutingKey，不使用交换机，此参数会被识别成队列名
+         * 参数三：消息的属性，通常设置为null
+         * 参数四：具体消息数据取值，byte[]类型
+         * */
+        String message = "Test fanout message !~"; // 需要发送的消息，通常使用字符串
+        // 因为是Fanout类型，不知道发给谁，所以不需要RoutingKey
+        channel.basicPublish(exchangeName, "", null, message.getBytes());
+
+        System.out.println("消息发送成功~");
+
+        // 释放资源
+        // 选释放通道资源
+        if (null != channel)
+            channel.close();
+        // 再释放连接资源
+        if (null != connection)
+            connection.close();
+    }
+}
+```
+
+3. 运行接收端和发送端进测试
+
+## 3. 基于topic的收发
+
+1. 编写接收端代码（多个）
+```java
+package com.example;
+
+import com.rabbitmq.client.*;
+
+import java.io.IOException;
+import java.util.concurrent.TimeoutException;
+
+public class TopicReceive01 {
+    public static void main(String[] args) throws IOException, TimeoutException {
+        // 创建连接工厂，用于指定RabbitMQ的连接信息
+        ConnectionFactory factory = new ConnectionFactory();
+        // 设置必要参数
+        factory.setHost("192.168.10.128"); // IP地址
+        factory.setPort(5672); // Broker端口
+        factory.setUsername("root"); // 用户名
+        factory.setPassword("root"); // 密码
+
+        // 新建连接（也可内部处理异常）
+        Connection connection = factory.newConnection();
+        // 通过连接创建通道
+        Channel channel = connection.createChannel();
+
+        /*
+         * 声明队列
+         * 参数一：队列名（自定义），如果队列名不存在则创建，存在则放弃
+         * 参数二：是否支持持久化
+         * 参数三：是否排外，true表示排外，如果消费者监听了这个队列，则不允许其他消费者监听此队列
+         * 参数四：是否删除，true表示自动删除，如果没有消息者监听这个队列则自动删除
+         * 参数五：队列的属性设置，通常设置为null
+         * */
+        // String queueName = UUID.randomUUID().toString();
+        // 设置第二个参数false - 持久化，第三个参数true - 排外，第四个参数true - 自动删除
+        // channel.queueDeclare(queueName, false, true, true, null);
+
+        // 等价于上面两行
+        String queueName = channel.queueDeclare().getQueue();
+
+        /*
+         * 声明交换机
+         * 参数一：交换机名称，如果不存在则创建，存在则放弃
+         * 参数二：交换机类型，取值为：direct fanout topic headers
+         * 参数三：是否持久化
+         * */
+        String exchangeName = "topicExchange";
+        channel.exchangeDeclare(exchangeName, "topic", true);
+
+        /*
+         * 将队列和交换机绑定
+         * 参数一：队列名
+         * 参数二：交换机名
+         * 参数三：绑定时的BindingKey
+         * topic可以使用通配符 * 或 #
+         * * 表示必须要匹配一个任意单词
+         * # 表示可以匹配任意个任意单词
+         * 多个单词之间可以使用点儿将其进行分隔，例如：it.ma.qf 或者 it.*
+         * */
+        channel.queueBind(queueName, exchangeName, "it");
+        // channel.queueBind(queueName, exchangeName, "it.*");
+        // channel.queueBind(queueName, exchangeName, "it.#");
+
+        // 接收代码：
+        /*
+         * 从MQ接收消息
+         * 参数一：队列名称
+         * 参数二：是否自动确认消息，true表示自动确认，当消接收后无论是否正确完成处理，都会自动从列表中称除
+         * 参数三：消息处理的回调方法
+         * 注意：
+         * basicConsume方法会在底层启动一个子线程，用于持续监听队列消息，所以不能关闭
+         * */
+        channel.basicConsume(queueName, true, new DefaultConsumer(channel) {
+            @Override
+            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
+                // super.handleDelivery(consumerTag, envelope, properties, body);
+                String message = new String(body);
+                System.out.println("接收到了Topic => " + message);
+            }
+        });
+    }
+}
+```
+
+2. 编写发送端代码
+```java
+package com.example;
+
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
+
+import java.io.IOException;
+import java.util.concurrent.TimeoutException;
+
+public class TopicSend {
+    public static void main(String[] args) throws IOException, TimeoutException {
+        // 创建连接工厂，用于指定RabbitMQ的连接信息
+        ConnectionFactory factory = new ConnectionFactory();
+        // 设置必要参数
+        factory.setHost("192.168.10.128"); // IP地址
+        factory.setPort(5672); // Broker端口
+        factory.setUsername("root"); // 用户名
+        factory.setPassword("root"); // 密码
+
+        // 新建连接（也可内部处理异常）
+        Connection connection = factory.newConnection();
+        // 通过连接创建通道
+        Channel channel = connection.createChannel();
+
+        // 声明队列（不需要创建队列）
+        // String queueName = "directQueue";
+        // channel.queueDeclare(queueName, true, false, false, null);
+
+        /*
+         * 声明交换机
+         * 参数一：交换机名称，如果不存在则创建，存在则放弃
+         * 参数二：交换机类型，取值为：direct fanout topic headers
+         * 参数三：是否持久化
+         * */
+        String exchangeName = "topicExchange";
+        channel.exchangeDeclare(exchangeName, "topic", true);
+
+        // 将队列和交换机绑定（不需要绑定，因不知道发给谁）
+        // channel.queueBind(queueName, exchangeName, "");
+
+        /*
+         * 发送消息到MQ
+         * 参数一：交换机名，不使用交换机则填写空串""
+         * 参数二：消息所携带的RoutingKey，不使用交换机，此参数会被识别成队列名
+         * 参数三：消息的属性，通常设置为null
+         * 参数四：具体消息数据取值，byte[]类型
+         * */
+        // String routingKey = "it";
+        // String routingKey = "it.a";
+        String routingKey = "it.ab";
+        String message = "Test topic message !~"; // 需要发送的消息，通常使用字符串
+        // topic类型
+        channel.basicPublish(exchangeName, routingKey, null, message.getBytes());
+
+        System.out.println("消息发送成功~");
+
+        // 释放资源
+        // 选释放通道资源
+        if (null != channel)
+            channel.close();
+        // 再释放连接资源
+        if (null != connection)
+            connection.close();
+    }
+}
+```
+
+3. 运行接收和发送端测试
 
 
+# 九、事务消息
+
+保证消息如果正确就全写入到MQ，不正确一旦出现问题就全都不写入MQ。其本质就是防止消息丢失。RabbitMQ中提供了两种方式来解决相关的问题：
+1. 通过AMQP提供的事务机制来实现
+2. 使用发送者确认模式来实现
+
+## 1. 事务相关方法
+
+方法 | 说明
+:- | :-
+`channel.txSelect()` | 声明启动事务模式
+`channel.txCommit()` | 事务提交
+`channel.txRollback()` | 事务回滚
+
+> 带有事务的发送
+
+```java
+package com.example;
+
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
+
+import java.io.IOException;
+import java.util.concurrent.TimeoutException;
+
+public class TransactionSend {
+    public static void main(String[] args) {
+        // 创建连接工厂,用于指定RabbitMQ的连接信息
+        ConnectionFactory factory = new ConnectionFactory();
+        // 设置必要参数
+        factory.setHost("192.168.10.128");
+        factory.setPort(5672);
+        factory.setUsername("root");
+        factory.setPassword("root");
+
+        // 新建连接
+        Connection connection = null;
+        Channel channel = null;
+        try {
+            connection = factory.newConnection();
+            channel = connection.createChannel();
+
+            // 声明队列
+            String queueName = "transactionQueue";
+            channel.queueDeclare(queueName, true, false, false, null);
+
+            // 声明交换机
+            String exchangeName = "transactionExchange";
+            channel.exchangeDeclare(exchangeName, "direct", true);
+
+            // 绑定交换机
+            channel.queueBind(queueName, exchangeName, "transactionKey");
+
+            // 定义消息数据
+            String message = "Direct transaction test message !~";
+
+            // 开启事务,必须要显示的调用txCommit()或者txRollback()
+            channel.txSelect();
+            // 发送时 参数一、参数二，使用具体的交换机名称和BindingKey
+            channel.basicPublish(exchangeName, "transactionKey", null, message.getBytes());
+            // 提交事务，当前通道的当前事务中的所有消息都写入到MQ中，并释放内存的记述当前事务
+            channel.txCommit();
+
+            System.out.println("发送成功~");
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (TimeoutException e) {
+            e.printStackTrace();
+        } finally {
+            // 先释放通道资源
+            if (null != channel) {
+                try {
+                    // 事务回滚，将当前通道中所有没有提交的消息全部删除并释放内存资源结束当前事务
+                    channel.txRollback();
+                    channel.close();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                } catch (TimeoutException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            // 再释放连接资源
+            if (null != connection) {
+                try {
+                    connection.close();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+    }
+}
+```
+
+## 2. 发送确认方式
+
+### 1) waitForConfirms
+
+```java
+package com.example;
+
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
+
+import java.io.IOException;
+import java.util.concurrent.TimeoutException;
+
+public class ConfirmSend {
+    public static void main(String[] args) {
+        // 创建连接工厂,用于指定RabbitMQ的连接信息
+        ConnectionFactory factory = new ConnectionFactory();
+        // 设置必要参数
+        factory.setHost("192.168.10.128");
+        factory.setPort(5672);
+        factory.setUsername("root");
+        factory.setPassword("root");
+
+        // 新建连接
+        Connection connection = null;
+        Channel channel = null;
+
+        try {
+            connection = factory.newConnection();
+            channel = connection.createChannel();
+
+            // 声明队列
+            String queueName = "confirmQueue";
+            channel.queueDeclare(queueName, true, false, false, null);
+
+            // 声明交换机
+            String exchangeName = "confirmExchange";
+            channel.exchangeDeclare(exchangeName, "direct", true);
+
+            // 绑定交换机
+            channel.queueBind(queueName, exchangeName, "confirmKey");
+
+            // 定义消息数据
+            String message = "Direct confirm test message !~";
+
+            // 开启发送确认模式
+            channel.confirmSelect();
+
+            // 发送时 参数一、参数二，使用具体的交换机名称和BindingKey
+            channel.basicPublish(exchangeName, "confirmKey", null, message.getBytes());
+
+            // 发送确认模式可能会造成MQ中的消息重复，消费者中需要拥有重复消息处理的能力
+            try {
+                // 这个方法会等待MQ返回确认信息，如果返回true表示成功，false表示失败
+                // 这是一个阻塞时间，避免卡死，阻塞超时会抛出 TimeoutException
+                if (!channel.waitForConfirms(5000L)) {
+                    System.out.println("重新补发消息");
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                // 如果出现异常也要补发消息
+                System.out.println("重新补发消息");
+            } catch (TimeoutException e) {
+                // 如果出现超时也要补发消息
+                System.out.println("重新补发消息");
+            }
+
+            System.out.println("发送成功~");
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (TimeoutException e) {
+            e.printStackTrace();
+        } finally {
+            // 先释放通道资源
+            if (null != channel) {
+                try {
+                    channel.close();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                } catch (TimeoutException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            // 再释放连接资源
+            if (null != connection) {
+                try {
+                    connection.close();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+    }
+}
+```
+
+### 2) waitForConfirmOrDie
+
+```java
+package com.example;
+
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
+
+import java.io.IOException;
+import java.util.concurrent.TimeoutException;
+
+public class ConfirmSend02 {
+    public static void main(String[] args) {
+        // 创建连接工厂,用于指定RabbitMQ的连接信息
+        ConnectionFactory factory = new ConnectionFactory();
+        // 设置必要参数
+        factory.setHost("192.168.10.128");
+        factory.setPort(5672);
+        factory.setUsername("root");
+        factory.setPassword("root");
+
+        // 新建连接
+        Connection connection = null;
+        Channel channel = null;
+
+        try {
+            connection = factory.newConnection();
+            channel = connection.createChannel();
+
+            // 声明队列
+            String queueName = "confirmQueue";
+            channel.queueDeclare(queueName, true, false, false, null);
+
+            // 声明交换机
+            String exchangeName = "confirmExchange";
+            channel.exchangeDeclare(exchangeName, "direct", true);
+
+            // 绑定交换机
+            channel.queueBind(queueName, exchangeName, "confirmKey");
+
+            // 定义消息数据
+            String message = "Direct confirm test message !~";
+
+            // 开启发送确认模式
+            channel.confirmSelect();
+
+            // 发送时 参数一、参数二，使用具体的交换机名称和BindingKey
+            channel.basicPublish(exchangeName, "confirmKey", null, message.getBytes());
+
+            // 发送确认模式可能会造成MQ中的消息重复，消费者中需要拥有重复消息处理的能力
+            try {
+                // 这个方法没有返回值，如果正常执行结束则成功，如查出现异常则表示失败
+                channel.waitForConfirmsOrDie(5000L);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                // 如果出现异常也要补发消息
+                System.out.println("重新补发消息");
+            } catch (TimeoutException e) {
+                // 如果出现超时也要补发消息
+                System.out.println("重新补发消息");
+            }
+
+            System.out.println("发送成功~");
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (TimeoutException e) {
+            e.printStackTrace();
+        } finally {
+            // 先释放通道资源
+            if (null != channel) {
+                try {
+                    channel.close();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                } catch (TimeoutException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            // 再释放连接资源
+            if (null != connection) {
+                try {
+                    connection.close();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+    }
+}
+```
+
+### 3) addConfirmListener
+
+```java
+package com.example;
+
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.ConfirmListener;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
+
+import java.io.IOException;
+import java.util.concurrent.TimeoutException;
+
+public class ConfirmSend03 {
+    public static void main(String[] args) {
+        // 创建连接工厂,用于指定RabbitMQ的连接信息
+        ConnectionFactory factory = new ConnectionFactory();
+        // 设置必要参数
+        factory.setHost("192.168.10.128");
+        factory.setPort(5672);
+        factory.setUsername("root");
+        factory.setPassword("root");
+
+        // 新建连接
+        Connection connection = null;
+        Channel channel = null;
+
+        try {
+            connection = factory.newConnection();
+            channel = connection.createChannel();
+
+            // 声明队列
+            String queueName = "confirmQueue";
+            channel.queueDeclare(queueName, true, false, false, null);
+
+            // 声明交换机
+            String exchangeName = "confirmExchange";
+            channel.exchangeDeclare(exchangeName, "direct", true);
+
+            // 绑定交换机
+            channel.queueBind(queueName, exchangeName, "confirmKey");
+
+            // 定义消息数据
+            String message = "Direct confirm test message !~";
+
+            // 开启发送确认模式
+            channel.confirmSelect();
+
+            // addConfirmListener
+            channel.addConfirmListener(new ConfirmListener() {
+
+                /**
+                 * 消息发送成功之后要执行的回调方法
+                 * @param l 消息编号
+                 * @param b 消息是否批量确认
+                 * @throws IOException
+                 */
+                @Override
+                public void handleAck(long l, boolean b) throws IOException {
+                    System.out.printf("消息成功发送，消息标号：%d，是否批量：%b\n", l, b);
+                }
+
+                /**
+                 * 消息发送失败之后要执行的回调方法
+                 * @param l 消息编号
+                 * @param b 消息是否批量确认
+                 * @throws IOException
+                 */
+                @Override
+                public void handleNack(long l, boolean b) throws IOException {
+                    System.out.printf("消息自己选择是否补发，消息标号：%d，是否批量：%b\n", l, b);
+                }
+            });
+
+            for (int i = 0; i < 100; i++) {
+                // 发送时 参数一、参数二，使用具体的交换机名称和BindingKey
+                channel.basicPublish(exchangeName, "confirmKey", null, message.getBytes());
+            }
+
+            System.out.println("发送成功~");
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (TimeoutException e) {
+            e.printStackTrace();
+        }
+        // addConfirmListener是异步的不要关掉通道和连接
+        /*finally {
+            // 先释放通道资源
+            if (null != channel) {
+                try {
+                    channel.close();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                } catch (TimeoutException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            // 再释放连接资源
+            if (null != connection) {
+                try {
+                    connection.close();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }*/
+    }
+}
+```
+
+### 4) 接收确认
+
+```java
+package com.example.receive;
+
+import com.rabbitmq.client.*;
+
+import java.io.IOException;
+import java.util.concurrent.TimeoutException;
+
+public class DirectReceive {
+    public static void main(String[] args) throws IOException, TimeoutException {
+        // 创建连接工厂，用于指定RabbitMQ的连接信息
+        ConnectionFactory factory = new ConnectionFactory();
+        // 设置必要参数
+        factory.setHost("192.168.10.128"); // IP地址
+        factory.setPort(5672); // Broker端口
+        factory.setUsername("root"); // 用户名
+        factory.setPassword("root"); // 密码
+
+        // 新建连接（也可内部处理异常）
+        Connection connection = factory.newConnection();
+        // 通过连接创建通道
+        Channel channel = connection.createChannel();
+
+        /*
+         * 声明队列
+         * 参数一：队列名（自定义），如果队列名不存在则创建，存在则放弃
+         * 参数二：是否支持持久化
+         * 参数三：是否排外，true表示排外，如果消费者监听了这个队列，则不允许其他消费者监听此队列
+         * 参数四：是否删除，true表示自动删除，如果没有消息者监听这个队列则自动删除
+         * 参数五：队列的属性设置，通常设置为null
+         * */
+        String queueName = "confirmQueue";
+        channel.queueDeclare(queueName, true, false, false, null);
+
+        /*
+         * 声明交换机
+         * 参数一：交换机名称，如果不存在则创建，存在则放弃
+         * 参数二：交换机类型，取值为：direct fanout topic headers
+         * 参数三：是否持久化
+         * */
+        String exchangeName = "confirmExchange";
+        channel.exchangeDeclare(exchangeName, "direct", true);
+        /*
+         * 将队列和交换机绑定
+         * 参数一：队列名
+         * 参数二：交换机名
+         * 参数三：绑定时的BindingKey
+         * */
+        channel.queueBind(queueName, exchangeName, "confirmKey");
+
+        // 接收代码：
+        /*
+         * 从MQ接收消息
+         * 参数一：队列名称
+         * 参数二：是否自动确认消息，true表示自动确认，当消接收后无论是否正确完成处理，都会自动从列表中称除
+         * 参数三：消息处理的回调方法
+         * 注意：
+         * basicConsume方法会在底层启动一个子线程，用于持续监听队列消息，所以不能关闭
+         * */
+        channel.basicConsume(queueName, false, new DefaultConsumer(channel) {
+            @Override
+            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
+                // super.handleDelivery(consumerTag, envelope, properties, body);
+                try {
+                    String message = new String(body);
+                    System.out.println("接收到了Direct => " + message);
+                    // System.out.println(1 / 0);
+                    // 手动确认消息，参数一：消息标号，参数二：批量确认
+                    this.getChannel().basicAck(envelope.getDeliveryTag(), true);
+                }catch (Exception e) {
+                    // 将没处理完的消息重新放回到队列当中，等待下次处理
+                    this.getChannel().basicRecover();
+                }
+            }
+        });
+    }
+}
+```
 
 
+# 十、SpringBoot整合RabbitMQ
+
+## 1. direct方式收发
+
+### 1) direct发送
+
+1. 创建模块，并添加起步依赖
+![[Pasted image 20230714175006.png]]
+
+2. 编写配置文件
+```properties
+# 简化控制台日志输出格式  
+logging.pattern.console=%d{MM/dd-HH:mm:ss} ===> %msg%n  
+  
+# 配置MQ相关连接信息（单机版）  
+spring.rabbitmq.host=192.168.10.128  
+spring.rabbitmq.port=5672  
+spring.rabbitmq.username=root  
+spring.rabbitmq.password=root
+```
+
+3. 编写发送服务类`com.example.service.SendService.java`
+```java
+package com.example.service;
+
+import org.springframework.amqp.core.AmqpTemplate;
+// import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.stereotype.Component;
+
+import javax.annotation.Resource;
+
+@Component // 把这个服务对象放到容器里
+public class SendService {
+    // 注入AMQP的模板工具类接口对象
+    // 这个对象支持一些基本的发送和接收
+    @Resource
+    private AmqpTemplate amqpTemplate;
+
+    // 注入RabbitTemplate模板工具类对象，这个类是AmqpTemplate接口的子类
+    // 这个对象可以完成对RabbitMQ的基本操作，比如消息的发送、接收、确认模式等
+    // @Resource
+    // private RabbitTemplate rabbitTemplate;
+
+    public void directSend(String message) {
+        // 将String类型的参数转换成我想要的消息形式
+        amqpTemplate.convertAndSend("directSpringBootExchange", "bodyKey", message);
+    }
+}
+```
+
+4. 编写配置类`com.example.conf.RabbitMQConf.java`
+```java
+package com.example.conf;
+
+import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.DirectExchange;
+import org.springframework.amqp.core.Queue;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class RabbitMQConf {
+    @Bean
+    public Queue directQueue() {
+        // 声明队列，并定义到Spring的容器中
+        return new Queue("directQueue");
+    }
+
+    @Bean
+    public DirectExchange directExchange() {
+        // 定义交换机对象，并定义到Spring容器中
+        return new DirectExchange("directSpringBootExchange");
+    }
+
+    @Bean
+    public Binding directBinding() {
+        /*
+         * 声明绑定规则
+         * 参数一：目的地名称，可以是队列名，也可以是交换机名，根据参数二而定
+         * 参数二：目的地类型，枚举类型，交换机或队列
+         * 参数三：交换机名
+         * 参数四：绑定时的routingKey
+         * 参数五：绑定参数属性，通常为null
+         * */
+        return new Binding(
+                "directQueue", // 队列名
+                Binding.DestinationType.QUEUE, // 第一个参数（目的地）的类型
+                "directSpringBootExchange", // 交换机名
+                "bodyKey", // BindingKey
+                null // 默认为空就行
+        );
+    }
+}
+```
+
+5. 修改引导类
+```java
+package com.example;
+
+import com.example.service.SendService;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+import javax.annotation.Resource;
+
+@SpringBootApplication
+public class Mq09SpringBootApplication implements CommandLineRunner {
+
+    @Resource
+    private SendService sendService;
+
+    public static void main(String[] args) {
+        SpringApplication.run(Mq09SpringBootApplication.class, args);
+    }
+
+    @Override
+    public void run(String... args) throws Exception {
+        sendService.directSend("SpringBoot direct send test message");
+    }
+}
+```
+
+6. 启动并测试发送，在管控台查看消息
+
+### 2) direct接收
+
+1. 创建模块，并添加起步依赖
+2. 编写properties配置文件，参考发送
+3. 编写配置，参考发送
+4. 编写接收服务类
+```java
+
+```
