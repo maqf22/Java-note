@@ -1573,5 +1573,383 @@ public class Mq09SpringBootApplication implements CommandLineRunner {
 3. 编写配置，参考发送
 4. 编写接收服务类
 ```java
+package com.example.service;
+
+// import org.springframework.amqp.core.AmqpTemplate;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.stereotype.Component;
+
+// import javax.annotation.Resource;
+
+@Component
+public class ReceiveService {
+    // @Resource
+    // private AmqpTemplate amqpTemplate;
+
+    /*public void directReceive() {
+        // 只能接收一条消息，不能持续监听队列
+        String message = (String) amqpTemplate.receiveAndConvert("directQueue");
+        System.out.println("正在消费 ==> " + message);
+    }*/
+
+    /*
+    * 用于持续监听队列
+    * 属性：
+    * queues - 用于指定要监听的队列名，取值为String数组，这个属性只能监听队列，不能声明，所以必须存在
+    * 注意：
+    * 这个监听器，自带消费者确认模式，如果当前方法抛出异常，则将消息放回队列尾部，成功则将消息移除队列
+    * 如果使用监听器监听消息，就不要再使用普通的接收方法
+    * */
+    @RabbitListener(queues = "directQueue")
+    public void directMessageListener(String message) {
+        System.out.println("正在消息 => " + message);
+    }
+}
+```
+5. 编写引导类 
+```java
+package com.example;
+
+// import com.example.service.ReceiveService;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+// import javax.annotation.Resource;
+
+@SpringBootApplication
+public class Mq10SpringBootReceiveApplication implements CommandLineRunner {
+    // @Resource
+    // private ReceiveService receiveService;
+
+    public static void main(String[] args) {
+        SpringApplication.run(Mq10SpringBootReceiveApplication.class, args);
+    }
+
+    @Override
+    public void run(String... args) throws Exception {
+        // receiveService.directReceive();
+    }
+}
+```
+6. 运行接收和发送进行测试
+
+## 2. fanout方式收发
+
+### 1) fanout接收
+
+`com.example.service.ReceiveService.java`
+```java
+package com.example.service;
+
+// import org.springframework.amqp.core.AmqpTemplate;
+
+import org.springframework.amqp.rabbit.annotation.Exchange;
+import org.springframework.amqp.rabbit.annotation.Queue;
+import org.springframework.amqp.rabbit.annotation.QueueBinding;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.stereotype.Component;
+
+// import javax.annotation.Resource;
+
+@Component
+public class ReceiveService {
+    // @Resource
+    // private AmqpTemplate amqpTemplate;
+
+    /*public void directReceive() {
+        // 只能接收一条消息，不能持续监听队列
+        String message = (String) amqpTemplate.receiveAndConvert("directQueue");
+        System.out.println("正在消费 ==> " + message);
+    }*/
+
+    /*
+     * 用于持续监听队列
+     * 属性：
+     * queues - 用于指定要监听的队列名，取值为String数组，这个属性只能监听队列，不能声明，所以必须存在
+     * 注意：
+     * 这个监听器，自带消费者确认模式，如果当前方法抛出异常，则将消息放回队列尾部，成功则将消息移除队列
+     * 如果使用监听器监听消息，就不要再使用普通的接收方法
+     * */
+    /*@RabbitListener(queues = "directQueue")
+    public void directMessageListener(String message) {
+        System.out.println("正在消息 => " + message);
+    }*/
+
+
+    /*
+    * 用于持续监听队列
+    * 属性：
+    * bindings 用于将队列和交换机进行绑定，取值为@QueueBinding数组
+    *   属性：
+    *   value 可用于声明使用这个队列，取值为 @Queue
+    *       @Queue 用于声明一个队列
+    *       属性：
+    *           value / name  用于指定队列名称，不指定则创建随机队列
+    *           durable  是否持久化，String类型 ”true“ 或 ”false“
+    *           exclusive  是排外，String类型 ”true“ 或 ”false“
+    *           autoDelete  是自动删除，String类型 ”true“ 或 ”false“
+    *   exchange 用于声明并使用这个交换机，取值为 @Exchange
+    *       @Exchange  用于声明一个交换机
+    *       属性：
+    *           value / name  用于指定交换机名称
+    *           type  交换机类型，String类型，取值：”direct“ / ”fanout“ / ”topic“ / ”headers“ 默认值为 ”direct“
+    *           durable
+    *           autoDelete
+    *   key  绑定是BindingKey 取值为 String 数组（可选）
+    * */
+    @RabbitListener(bindings = { @QueueBinding(value = @Queue, exchange = @Exchange(name = "fanoutSpringBootExchange", type = "fanout")) })
+    public void fanoutMessageListener01(String message) {
+        System.out.println("fanoutMessageListener01 --> " + message);
+    }
+
+    @RabbitListener(bindings = { @QueueBinding(value = @Queue, exchange = @Exchange(name = "fanoutSpringBootExchange", type = "fanout")) })
+    public void fanoutMessageListener02(String message) {
+        System.out.println("fanoutMessageListener02 --> " + message);
+    }
+}
+```
+
+### 2) fanout发送
+
+- `com.example.service.SendService.java`
+```java
+// fanout 发送
+public void fanoutSend(String message) {
+	// 将String类型的参数转换成我想要的消息形式
+	amqpTemplate.convertAndSend("fanoutSpringBootExchange", "", message);
+}
+```
+
+- `com.example.conf.RabbitMqConf.java`
+```java
+@Bean
+public FanoutExchange fanoutExchange() {
+	// 定义交换机对象，并定义到Spring容器中
+	return new FanoutExchange("fanoutSpringBootExchange");
+}
+```
+
+- `引导类`
+```java
+@Override  
+public void run(String... args) throws Exception {  
+    // sendService.directSend("SpringBoot direct send test message");  
+    sendService.fanoutSend("SpringBoot fanout send test message");  
+}
+```
+
+## 3. topic方式收发
+
+### 1) topic接收
+
+`com.example.service.Receive.java`
+```java
+package com.example.service;
+
+// import org.springframework.amqp.core.AmqpTemplate;
+
+import org.springframework.amqp.rabbit.annotation.Exchange;
+import org.springframework.amqp.rabbit.annotation.Queue;
+import org.springframework.amqp.rabbit.annotation.QueueBinding;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.stereotype.Component;
+
+// import javax.annotation.Resource;
+
+@Component
+public class ReceiveService {
+    // @Resource
+    // private AmqpTemplate amqpTemplate;
+
+    /*public void directReceive() {
+        // 只能接收一条消息，不能持续监听队列
+        String message = (String) amqpTemplate.receiveAndConvert("directQueue");
+        System.out.println("正在消费 ==> " + message);
+    }*/
+
+    /*
+     * 用于持续监听队列
+     * 属性：
+     * queues - 用于指定要监听的队列名，取值为String数组，这个属性只能监听队列，不能声明，所以必须存在
+     * 注意：
+     * 这个监听器，自带消费者确认模式，如果当前方法抛出异常，则将消息放回队列尾部，成功则将消息移除队列
+     * 如果使用监听器监听消息，就不要再使用普通的接收方法
+     * */
+    /*@RabbitListener(queues = "directQueue")
+    public void directMessageListener(String message) {
+        System.out.println("正在消息 => " + message);
+    }*/
+
+
+    /*
+     * 用于持续监听队列
+     * 属性：
+     * bindings 用于将队列和交换机进行绑定，取值为@QueueBinding数组
+     *   属性：
+     *   value 可用于声明使用这个队列，取值为 @Queue
+     *       @Queue 用于声明一个队列
+     *       属性：
+     *           value / name  用于指定队列名称，不指定则创建随机队列
+     *           durable  是否持久化，String类型 ”true“ 或 ”false“
+     *           exclusive  是排外，String类型 ”true“ 或 ”false“
+     *           autoDelete  是自动删除，String类型 ”true“ 或 ”false“
+     *   exchange 用于声明并使用这个交换机，取值为 @Exchange
+     *       @Exchange  用于声明一个交换机
+     *       属性：
+     *           value / name  用于指定交换机名称
+     *           type  交换机类型，String类型，取值：”direct“ / ”fanout“ / ”topic“ / ”headers“ 默认值为 ”direct“
+     *           durable
+     *           autoDelete
+     *   key  绑定是BindingKey 取值为 String 数组（可选）
+     * */
+    /*@RabbitListener(bindings = { @QueueBinding(value = @Queue, exchange = @Exchange(name = "fanoutSpringBootExchange", type = "fanout")) })
+    public void fanoutMessageListener01(String message) {
+        System.out.println("fanoutMessageListener01 --> " + message);
+    }
+
+    @RabbitListener(bindings = { @QueueBinding(value = @Queue, exchange = @Exchange(name = "fanoutSpringBootExchange", type = "fanout")) })
+    public void fanoutMessageListener02(String message) {
+        System.out.println("fanoutMessageListener02 --> " + message);
+    }*/
+
+
+    @RabbitListener(bindings = {@QueueBinding(key = "it", value = @Queue(), exchange = @Exchange(name = "topicSpringBootExchange", type = "topic"))})
+    public void topicMessageListener01(String message) {
+        System.out.println("topicMessageList -01 --- BindingKey = it --> " + message);
+    }
+
+    @RabbitListener(bindings = {@QueueBinding(key = "it.*", value = @Queue(), exchange = @Exchange(name = "topicSpringBootExchange", type = "topic"))})
+    public void topicMessageListener02(String message) {
+        System.out.println("topicMessageList -02 --- BindingKey = it.* --> " + message);
+    }
+
+    @RabbitListener(bindings = {@QueueBinding(key = "it.#", value = @Queue(), exchange = @Exchange(name = "topicSpringBootExchange", type = "topic"))})
+    public void topicMessageListener03(String message) {
+        System.out.println("topicMessageList -03 --- BindingKey = it.# --> " + message);
+    }
+}
+```
+
+### 2) topic发送
+
+- `SendService.java`
+```java
+// topic 订阅发送  
+public void topicSend(String message, String routingKey) {  
+    // 将String类型的参数转换成我想要的消息形式  
+    amqpTemplate.convertAndSend("topicSpringBootExchange", routingKey, message);  
+}
+```
+
+- `RabbitMQConf.java`
+```java
+@Bean
+public TopicExchange topicExchange() {
+	// 定义交换机对象，并定义到Spring容器中
+	return new TopicExchange("topicSpringBootExchange");
+}
+```
+
+- `引导类`
+```java
+package com.example;
+
+import com.example.service.SendService;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+import javax.annotation.Resource;
+
+@SpringBootApplication
+public class Mq09SpringBootApplication implements CommandLineRunner {
+
+    @Resource
+    private SendService sendService;
+
+    public static void main(String[] args) {
+        SpringApplication.run(Mq09SpringBootApplication.class, args);
+    }
+
+    @Override
+    public void run(String... args) throws Exception {
+        // sendService.directSend("SpringBoot direct send test message");
+        // sendService.fanoutSend("SpringBoot fanout send test message");
+        sendService.topicSend("SpringBoot topic send test message", "it.maqf");
+    }
+}
+```
+
+
+# 十一、RabbitMQ集群
+
+常见的RabbitMQ模式
+- 普通模式（默认模式）
+- 镜像模式（高可用模式）
+
+## 1. 集群搭建过程 
+
+1. 克隆两个已搭建RabbitMQ的CentOS7，分别命名为CentOS7-A和CentOS7-B
+2. 修改主机名分别为A和B，配置文件`etc/hostname`
+3. 清空之前的MQ使用痕迹，清空`/var/lib/rabbimq/mnesia/`下的所有内容
+4. 修改RabbitMQ的节点名分别为`rabbit@A`和`rabbit@B`，配置文件`/etc/rabbitmq/rabbitmq-env.conf`
+5. 保证两个系统中的`/var/lib/rabbitmq/.erlang.cookie`内容完全相同
+
+6. 分别修改两个系统中的`/etc/hosts`文件设置主机名，之后重启系统（根据实际IP地址进行修改，配置完成后最好重启一下服务器）
+```
+# A hosts
+127.0.0.1 A   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1       A   localhost localhost.localdomain localhost6 localhost6.localdomain6
+192.168.10.129 A
+192.168.10.130 B
+```
 
 ```
+# B hosts
+127.0.0.1 B   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1       B   localhost localhost.localdomain localhost6 localhost6.localdomain6
+192.168.10.129 A
+192.168.10.130 B
+```
+
+7. 配置远程连接终端并连接，步骤参考之前安装
+8. 分别启动两台RabbitMQ `rabbitmq-server start &`
+9. 添加用户，并设权限，参考之前的用户管理和权限管理部分
+10. 在B中添加A配置集群环境
+```
+rabbitmqctl stop_app
+rabbitmqctl join_cluster rabbit@A
+rabbitmqctl start_app
+```
+
+12. 查看并确认添加成功
+```
+rabbitmqctl cluster_status
+```
+
+13. 管控台查看配置是否生效
+![[Pasted image 20230717141713.png]]
+
+## 2. 项目中集群配置
+
+```properties
+# 简化控制台日志输出格式
+logging.pattern.console=%d{MM/dd-HH:mm:ss} ==> %msg%n
+
+# 配置MQ相关连接信息（集群版）
+spring.rabbitmq.address=192.168.10.129:5672,192.168.10.130:5672
+spring.rabbitmq.username=root
+spring.rabbitmq.password=root
+```
+
+## 3. 实现高可用集群
+
+![[Pasted image 20230717142142.png]]
+
+
+
+
+
+
+
