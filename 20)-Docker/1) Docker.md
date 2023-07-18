@@ -206,6 +206,248 @@ docker run -it --name=c02 --volumes-from ct centos:7
 3. 测试
 
 
+# 七、Docker应用部署
+
+> 容器内的网络服务和外部的访问终端是不能直接通信的，需要通过**端口映射**的方式实现访问
+
+## 1. MySQL
+
+- `my.cnf`
+```cnf
+[client]
+default-character-set=utf8
+
+[mysql]
+default-character-set=utf8
+
+[mysqld]
+collation-server=utf8_unicode_ci
+init-connect='SET NAMES utf8'
+character_set_server=utf8
+
+general_log=ON
+general_log_file=/var/log/mysql/mysql.log
+```
+
+```shell
+docker pull mysql:5.7
+
+docker run -id -p 3306:3306 \
+> --name=cMySQL \
+> -v /root/mysql/conf:/etc/mysql \
+> -v /root/mysql/logs:/var/log/mysql \
+> -v /root/mysql/data:/var/lib/mysql \
+> -e MYSQL_ROOT_PASSWORD=root \
+> mysql:5.7
+
+docker exec -it cMySQL /bin/bash
+```
+
+## 2. Redis
+
+```shell
+docker pull redis
+
+docker run -id --name=cRedis -p 6379:6379 redis
+docker exec -it cRedis /bin/bash
+```
+
+## 3. Tomcat
+
+```shell
+docker pull tomcat:9
+
+mkdir /root/tomcat/ROOT
+
+docker run -id --name=cTomcat \
+-p 8080:8080 \
+-v /root/tomcat/ROOT:/usr/local/tomcat/webapps \
+tomcat:9
+
+docker exec -it cTomcat /bin/bash
+```
+
+
+# 八、Dockerfile
+
+## 1. 将容器转换为镜像
+
+命令 | 说明
+:- | :-
+`docker commit 容器id 镜像名称：版本号` | 将容器保存为镜像
+`docker save -o 压缩文件名 镜像名称：版本号` | 将镜像保存为压缩文件
+`docker load -i 压缩文件名称` | 将压缩文件还原成镜像文件
+
+> 使用`docker commit 保存的镜像，只能在保存镜像内部发生的变化，这里不包括之前通过镜像创建容器过程中挂载的数据卷
+
+## 2. 使用Dockerfile
+
+> dockerfile是一个由各种指令组成的文本文件。指令适用于构建镜像的。通常用于避免开发、测试 、 运维环境水土不服问题 
+
+- 案例：自定义CentOS7镜像，默认登录路径为/root，集成Vim和ifconfig命令
+
+```dockerfile
+FROM centos:7
+
+MAINTAINER maqf maqf@maqf.com
+
+WORKDIR /root
+
+RUN yum install -y vim
+RUN yum install -y net-tools
+
+CMD /bin/bash
+```
+
+> 使用 `docker build -f dockerfile文件名 -t 镜像名:版本号 .`  通过dockerfile文件创建镜像
+> 使用镜像创建容器并进入测试 `docker run -it --name=容器名 镜像名:版本号`
+
+```shell
+docker build -f myDockerfile.dockerfile -t mycentos:7 .
+```
+
+- 案例：部署一个SpringBoot项目到docker
+
+```dockerfile
+FROM java:8
+
+MAINTAINER maqf maqf@maqf.com
+
+ADD dockerSpringBoot-9527.jar app.jar
+
+CMD java -jar app.jar
+```
+
+```shell
+docker build -f mySpringBoot.dockerfile -t app:1.0 .
+```
+
+`测试 192.168.10.128:8080`
+
+
+# 九、Docker Compose
+
+> 服务编排，主要应用于微服务。使用Docker Compose进行统一批量的管理
+> Docker Compose是一个编排多容器分布式部署的工具，提供命令脚本管理
+> 容器化应用的完整开发流程，包括服务构建、启动、停止服务
+
+## 1. Docker Compose安装与卸载
+
+- 安装
+```shell
+# 下载到本地
+curl -L https://github.com/docker/compose/releases/download/1.29.0/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
+
+# 添加访问权限
+chmod a+x /usr/local/bin/docker-compose
+
+# 查看版本号
+docker-compose -version
+```
+
+- 卸载
+```shell
+# 删除下载目录即可
+rm /usr/local/bin/docker-compose -rf
+```
+
+## 2. 使用步骤
+
+1. 使用`Dockerfile`定义运行环境
+![[Pasted image 20230718152735.png]]
+3. 使用`docker-compose.yml`
+4. 运行`docker-compose up`启动应用
+
+- 案例-搭建基于Nginx反向代理访问的SpringBoot项目
+5. 创建一个用于测试的`docker-compose`工作目录
+```shell
+mkdir /root/docker-compose/nginx/conf.d -p
+cd /root/docker-compose
+```
+2. 编写`docker-compose.yml`配置文件
+```yml
+version: '3.5'
+services:
+	nginx:
+		image: nginx
+		ports:
+			- 80:80
+		links:
+			- app
+		volumes:
+			- ./nginx/conf.d:/etc/nginx/conf.d
+	app:
+		image: app:1.0
+		expose:
+			- "9527"
+```
+3. 编写`/root/docker-compose/nginx/conf.d/nginx.conf`配置文件
+```conf
+server {
+	listen 80;
+	access_log off;
+
+	location / {
+		proxy_pass http://app:9527;
+	}
+}
+```
+4. 通过`docker-compose up`命令启动应用
+5. 通过浏览器访问：`http://192.16.1.128`
+
+
+# 十、Docker私有仓库
+
+## 1. 创建私有仓库
+
+```sh
+#!/bin/bash
+# 创建docker私有仓库
+# 拉取私有仓库功能镜像
+docker pull registry
+# 启动私有仓库容器
+docker run -id --name=registry -p 5000:5000 registry
+# 添加私有仓库信任配置到json配置文件
+sudo tee /etc/docker/daemon.json <<-'EOF'
+{
+	"registry-mirrors":["https://6jjvg109.mirror.aliyuncs.com"]
+	"insecure-registries":["192.168.10.128:5000"]
+}
+EOF
+# 重新加载daemon.json配置文件
+systemctl daemon-reload
+# 重启docker服务
+systemlctl restart docker
+# 启动容器
+docker start registry
+```
+
+## 2. 上传镜像到私有仓库
+
+```sh
+# 标记镜像为私有仓库镜像
+docker tag centos:7 192.168.10.128:5000/centos:7
+
+# 上传标记的镜像
+docker push 192.168.10.128:5000/centos:7
+```
+
+## 3. 从私有仓库拉取镜像
+
+```shell
+docker pull 192.168.10.128:5000/centos:7
+```
+
+> 更多使用方法详见Docker官网 https://docs.docker.com/get-started/
+
+
+
+
+
+
+
+
+
 
 
 
