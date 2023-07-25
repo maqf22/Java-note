@@ -1,6 +1,86 @@
 
 # 一、MySQL环境搭建及配置
 
+1. 下载 MySQL yum包
+`wget http://repo.mysql.com/mysql57-community-release-el7-10.noarch.rpm`
+2. 安装MySQL源
+`rpm -Uvh mysql57-community-release-el7-10.noarch.rpm`
+3. 安装MySQL服务端,需要等待一些时间
+`yum install -y mysql-community-server`
+4. 启动MySQL
+`systemctl start mysqld.service`
+5. 检查是否启动成功
+`systemctl status mysqld.service`
+6. 获取临时密码，MySQL5.7为root用户随机生成了一个密码
+`grep 'temporary password' /var/log/mysqld.log`
+7. 通过临时密码登录MySQL，进行修改密码操作
+`mysql -uroot -p`
+`使用临时密码登录后，不能进行其他的操作，否则会报错，这时候我们进行修改密码操作`
+8. 因为MySQL的密码规则需要很复杂，我们一般自己设置的不会设置成这样，所以我们全局修改下下
+`mysql> set global validate_password_policy=0;`
+`mysql> set global validate_password_length=1;`
+`这时候我们就可以自己设置想要的密码了`
+`ALTER USER 'root'@'localhost' IDENTIFIED BY 'yourpassword';`
+9. 授权其他机器远程登录
+`GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY 'yourpassword' WITH GRANT OPTION;`
+`FLUSH PRIVILEGES;`
+```mysql
+use mysql;
+select `host`, `user` from `user`;
++-----------+---------------+
+| host      | user          |
++-----------+---------------+
+| %         | root          |
+| localhost | mysql.session |
+| localhost | mysql.sys     |
+| localhost | root          |
++-----------+---------------+
+# % 为任何地址都可以远程连接到该数据库
+```
+10. 开启开机自启动
+ `先退出mysql命令行，然后输入以下命令`
+`systemctl enable mysqld
+`systemctl daemon-reload`
+11.设置MySQL的字符集为UTF-8，令其支持中文
+`vim /etc/my.cnf`
+```
+# For advice on how to change settings please see
+# http://dev.mysql.com/doc/refman/5.7/en/server-configuration-defaults.html
+ 
+[mysql]
+default-character-set=utf8
+ 
+[mysqld]
+datadir=/var/lib/mysql
+socket=/var/lib/mysql/mysql.sock
+default-storage-engine=INNODB
+character_set_server=utf8
+ 
+symbolic-links=0
+ 
+log-error=/var/log/mysqld.log
+pid-file=/var/run/mysqld/mysqld.pid
+```
+12. 重启一下MySQL,令配置生效
+`service mysqld restart`
+13. 防火墙开放3306端口
+```
+firewall-cmd --state 
+firewall-cmd --zone=public --add-port=3306/tcp --permanent 
+firewall-cmd --reload
+```
+14. 卸载MySQL仓库
+`一开始的时候我们安装的yum，每次yum操作都会更新一次，耗费时间，我们把他卸载掉`
+`rpm -qa | grep mysql`
+`yum -y remove mysql57-community-release-el7-10.noarch`
+
+> [!TIP]
+> "MySQL 5.7 Community Server Development Milestone Release" 的 GPG 密钥已安装，但是不适用于此软件包。请检查源的公钥 URL 是否配置正确。
+> 查了一下需要import mysql的公钥到RPM的配置中，直接运行：
+> `rpm --importhttps://repo.mysql.com/RPM-GPG-KEY-mysql-2022`
+
+____
+
 1. 安装MySQL
 2. 配置环境变量path，在path值当中添加mysql可执行文件所有在目录
 3. 在命令行输入mysql -u root -h 127.0.0.1 -p 回库

@@ -372,7 +372,7 @@ shutdown | 关闭正在运行的redis-server
 
 - `redis-6379.conf`中保留以下内容即可
 ```
-daemonize yes
+daemonize yes  # 是否要用守护线程的方式启动
 port 6379
 bind 127.0.0.1
 logfile redis-6379.log
