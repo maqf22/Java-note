@@ -1443,6 +1443,7 @@ public class DirectReceive {
 
 # 十、SpringBoot整合RabbitMQ
 
+
 ## 1. direct方式收发
 
 ### 1) direct发送
